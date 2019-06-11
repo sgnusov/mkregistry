@@ -128,16 +128,18 @@ object SparkUI {
         // Bear data
         http.get("/api/bears") { req, res ->
             val login = sessions.get(req.cookie("session"))
-            if (login == null)
+            if (login == null) {
                 res.redirect("/")
-            val bears = partyProxy.vaultQuery(StateContract.BearState::class.java).states.filter { it: StateAndRef<StateContract.BearState> ->
-                (it.state.data.ownerLogin == login)
+            } else {
+                val bears = partyProxy.vaultQuery(StateContract.BearState::class.java).states.filter { it: StateAndRef<StateContract.BearState> ->
+                    (it.state.data.ownerLogin == login)
+                }
+                var result = "Your bears: <br>"
+                for (bear in bears) {
+                    result += bear.state.data.color.toString() + "<br>"
+                }
+                return@get result
             }
-            var result = "Your baers: <br>"
-            for (bear in bears) {
-                result += bear.state.data.color.toString() + "<br>"
-            }
-            return@get result
         }
     }
 
