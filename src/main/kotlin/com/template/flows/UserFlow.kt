@@ -2,7 +2,6 @@ package com.template.flows
 
 import co.paralleluniverse.fibers.Suspendable
 import com.sun.org.apache.xpath.internal.operations.Bool
-import com.template.contracts.BearContract
 import com.template.contracts.UserContract
 import com.template.states.StateContract
 import net.corda.core.contracts.Command

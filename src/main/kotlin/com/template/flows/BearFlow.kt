@@ -1,7 +1,7 @@
 package com.template.flows
 
 import co.paralleluniverse.fibers.Suspendable
-import com.template.contracts.BearContract
+import com.template.contracts.BearIssueContract
 import com.template.states.StateContract
 import net.corda.client.rpc.CordaRPCClient
 import net.corda.core.contracts.Command
@@ -42,12 +42,12 @@ object BearFlows
             // Generate an unsigned transaction.
             val iouState = StateContract.BearState(color, login, ourIdentity)
 
-            val txCommand = Command(BearContract.Issue(), iouState.participants.map { it.owningKey })
+            val txCommand = Command(BearIssueContract.Issue(), iouState.participants.map { it.owningKey })
             val txBuilder = TransactionBuilder(notary)
                     .addCommand(txCommand)
 
             for(i in 1..100) {
-                txBuilder.addOutputState(iouState, "com.template.contracts.BearContract")
+                txBuilder.addOutputState(iouState, "com.template.contracts.BearIssueContract")
             }
 
             // Stage 2.

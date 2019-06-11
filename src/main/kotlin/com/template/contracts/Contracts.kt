@@ -7,9 +7,9 @@ import net.corda.core.transactions.LedgerTransaction
 // ************
 // * Contract *
 // ************
-class BearContract : Contract {
+class BearIssueContract : Contract {
     companion object {
-        const val ID = "com.template.contracts.BearContract"
+        const val ID = "com.template.contracts.BearIssueContract"
     }
 
     class Issue : CommandData
@@ -33,6 +33,3 @@ class UserContract : Contract {
         }
     }
 }
-
-
-

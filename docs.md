@@ -13,9 +13,9 @@
 
 *Handled by userlist party.*
 
-Issues command with UserCreateContract and UserState as output.
+Issues command with UserContract and UserState as output.
 
-#### UserCreateContract
+#### UserContract
 
 The output state is UserState, no old username is reused; pass_hash starts with 000.
 
@@ -44,22 +44,11 @@ Issues a command with BearPresentContract, and changes bear's owner.
 The input and output state are BearStates; the input bear characteristics match the output bear.
 
 
-### BalanceInitFlow(val login: String)
-
-*Handled by userlist party.*
-
-Creates 10 "random" (hardcoded in fact) Bears for "login" user. This is internally implemented as a BearIssueFlow, signed by userlist party. The request is sent to network nodes.
-
-#### BalanceInitContract
-
-The output states are all BearStates.
-
-
 ### BearIssueFlow(val color: Int, val login: String)
 
 *Handled by all nodes.*
 
-Creates a bear. This flow must be signed by userlist party.
+Creates 100 bears. The userlist party must contain exactly one user registered.
 
 #### BearIssueContract
 
@@ -72,7 +61,7 @@ The output state is a BearState.
 2. Choose party
 3. Initiate UserCreateFlow(login, salt, salted password hash, party) with userlist party
 4. Get confirmation or report an error
-5. UserCreateFlow might initiate BalanceInitFlow(login) as a subflow if it is the first user registered
+5. Initiate BearIssueFlow(random_color, login) if it is the first user registered
 6. Get confirmation or report an error
 7. Redirect the user to bear manager party
 
