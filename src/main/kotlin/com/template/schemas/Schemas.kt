@@ -54,40 +54,20 @@ object UserSchemaV1 : MappedSchema(
     @Entity
     @Table(name = "iou_states")
     class PersistentUser(
-            @Column(name = "lender")
-            var lenderName: String,
-
-            @Column(name = "borrower")
-            var borrowerName: String,
+            @Column(name = "registerer")
+            var registererName: String,
 
             @Column(name = "login")
             var login: String,
 
             @Column(name = "password")
-            var password: String,
-
-            @Column(name = "adminRight")
-            var adminRight: Boolean,
-
-            @Column(name = "uploadRight")
-            var uploadRight: Boolean,
-
-            @Column(name = "sendRight")
-            var sendRight: Boolean,
-
-            @Column(name = "markRight")
-            var markRight: Boolean
+            var password: String
     ) : PersistentState() {
         // Default constructor required by hibernate.
         constructor(): this(
                 "",
                 "",
-                "",
-                "",
-                false,
-                false,
-                false,
-                false
+                ""
         )
     }
 }

@@ -154,7 +154,7 @@ cordapps = [
 rpcUsers = [[ user: "user1", "password": "test", "permissions": ["ALL"]]] 
 } 
 node { 
-name "O=PartyG,L=New York,C=US" 
+name "O=UserList,L=New York,C=US"
 p2pPort 10014 
 rpcSettings { 
 address("localhost:10005") 

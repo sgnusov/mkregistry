@@ -1,6 +1,6 @@
 package com.template
 
-import com.template.web.*
+import com.template.web.SparkUI
 import com.template.states.StateContract.UserState
 import net.corda.core.identity.CordaX500Name
 import net.corda.core.utilities.getOrThrow
@@ -20,7 +20,7 @@ object NodeDriver {
 
 
         driver(DriverParameters(startNodesInProcess = true, waitForAllNodesToFinish = true)) {
-            startNode(providedName = CordaX500Name("PartyG", "New York", "US"), rpcUsers = rpcUsers).getOrThrow()
+            startNode(providedName = CordaX500Name("UserList", "New York", "US"), rpcUsers = rpcUsers).getOrThrow()
             ///*
             startNode(providedName = CordaX500Name("PartyA", "London", "GB"), rpcUsers = rpcUsers).getOrThrow()
             startNode(providedName = CordaX500Name("PartyB", "New York", "US"), rpcUsers = rpcUsers).getOrThrow()
@@ -32,17 +32,17 @@ object NodeDriver {
 
             //*/
 
-            SparkAdmin.main(arrayOf("1234", "localhost:10005"))
+            SparkUI.main(arrayOf("1234", "localhost:10005"))
 
             ///*
-            SparkUpload.main(arrayOf("2345", "localhost:10009", "localhost:10005"))
-            SparkSend.main(arrayOf("3456", "localhost:10013", "localhost:10005"))
-            SparkMark.main(arrayOf(
-                    "4567", "localhost:10017",
-                    "5678", "localhost:10021",
-                    "6789", "localhost:10025",
-                    "localhost:10005"))
-            SparkViewResults.main(arrayOf("7890", "localhost:10029", "localhost:10005"))
+            // SparkUpload.main(arrayOf("2345", "localhost:10009", "localhost:10005"))
+            // SparkSend.main(arrayOf("3456", "localhost:10013", "localhost:10005"))
+            // SparkMark.main(arrayOf(
+            //         "4567", "localhost:10017",
+            //         "5678", "localhost:10021",
+            //         "6789", "localhost:10025",
+            //         "localhost:10005"))
+            // SparkViewResults.main(arrayOf("7890", "localhost:10029", "localhost:10005"))
         }
 
     }
