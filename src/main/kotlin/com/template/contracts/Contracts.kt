@@ -16,6 +16,10 @@ class BearIssueContract : Contract {
 
     override fun verify(tx: LedgerTransaction) {
         requireThat {
+            "This doesn't consume any bears." using (tx.inputs.isEmpty())
+            for (output in tx.outputs) {
+                "This issues a bear." using (output.data is StateContract.BearState)
+            }
         }
     }
 }
@@ -28,8 +32,9 @@ class UserContract : Contract {
     class Create : CommandData
 
     override fun verify(tx: LedgerTransaction) {
-
         requireThat {
+            "This doesn't consume any users." using (tx.inputs.isEmpty())
+            "This creates a single user." using (tx.outputs.single().data is StateContract.UserState)
         }
     }
 }
