@@ -46,7 +46,8 @@ object SparkUI {
                 freeMarkerEngine.render(ModelAndView(model, "SparkLogin.ftl"))
             } else {
                 val login = sessions.get(session)
-                return@get "Hello, ${login}!"
+                val model = hashMapOf("login" to login)
+                freeMarkerEngine.render(ModelAndView(model, "SparkHome.ftl"))
             }
         }
         http.get("/register") { req, _ ->
