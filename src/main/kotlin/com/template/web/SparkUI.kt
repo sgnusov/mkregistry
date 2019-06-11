@@ -14,6 +14,7 @@ import spark.template.freemarker.FreeMarkerEngine
 import java.util.HashMap
 import com.template.flows.UserFlows.UserCreateFlow
 import com.template.flows.BearFlows.BearIssueFlow
+import com.template.flows.BearFlows.BearPresentFlow
 import com.template.schemas.UserSchemaV1
 import net.corda.core.messaging.startFlow
 import net.corda.core.messaging.vaultQueryBy
@@ -50,9 +51,14 @@ object SparkUI {
             } else {
                 val login = sessions.get(session)
                 val model = hashMapOf("login" to login)
+                // Load & add bears to model
+                model["bears"] = partyProxy.vaultQuery(StateContract.BearState::class.java).states.filter { it: StateAndRef<StateContract.BearState> ->
+                    (it.state.data.ownerLogin == login)
+                }.map { it.state.data }
                 freeMarkerEngine.render(ModelAndView(model, "SparkHome.ftl"))
             }
         }
+
         http.get("/register") { req, _ ->
             val model = hashMapOf("error" to "")
             freeMarkerEngine.render(ModelAndView(model, "SparkRegister.ftl"))
@@ -140,6 +146,18 @@ object SparkUI {
                 }
                 return@get result
             }
+        }
+        http.post("/api/present") { req, res ->
+            val login = sessions.get(req.cookie("session")) as String
+            val color = req.queryParamsValues("color").single().toInt()
+            val receiverLogin = req.queryParamsValues("receiver").single()
+            // Check that we have this bear
+            val bear = partyProxy.vaultQuery(StateContract.BearState::class.java).states.filter { it: StateAndRef<StateContract.BearState> ->
+                (it.state.data.ownerLogin == login && it.state.data.color == color)
+            }[0]
+            // Initiate BearPresentFlow
+            partyProxy.startFlow(::BearPresentFlow, login, receiverLogin, color).returnValue.getOrThrow()
+            res.redirect("/")
         }
     }
 

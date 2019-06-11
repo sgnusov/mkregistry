@@ -7,19 +7,16 @@ import net.corda.core.transactions.LedgerTransaction
 // ************
 // * Contract *
 // ************
-class BearIssueContract : Contract {
+class BearContract : Contract {
     companion object {
-        const val ID = "com.template.contracts.BearIssueContract"
+        const val ID = "com.template.contracts.BearContract"
     }
 
     class Issue : CommandData
+    class Present : CommandData
 
     override fun verify(tx: LedgerTransaction) {
         requireThat {
-            "This doesn't consume any bears." using (tx.inputs.isEmpty())
-            for (output in tx.outputs) {
-                "This issues a bear." using (output.data is StateContract.BearState)
-            }
         }
     }
 }
@@ -33,8 +30,6 @@ class UserContract : Contract {
 
     override fun verify(tx: LedgerTransaction) {
         requireThat {
-            "This doesn't consume any users." using (tx.inputs.isEmpty())
-            "This creates a single user." using (tx.outputs.single().data is StateContract.UserState)
         }
     }
 }

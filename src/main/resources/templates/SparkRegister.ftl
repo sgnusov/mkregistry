@@ -13,7 +13,7 @@
             Login: <input type="text" name="login" id="login"><br>
             Password: <input type="text" name="password" id="password"><br>
             PoW: <input type="button" id="nonceButton" onclick="generateNonce()" value="Generate nonce (this might take some time)"><br>
-            <input type="submit" value="Register" onclick="register()"> ${error}
+            <input type="submit" value="Register" onclick="return register()"> ${error}
         </form>
         <a href="/">Login</a>
 

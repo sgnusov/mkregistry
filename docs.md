@@ -7,17 +7,13 @@
 2. Network nodes
 3. Userlist party
 
-## Flows & contracts
+## Flows
 
 ### UserCreateFlow(val login: String, val salt: String, val pass_hash: String, val party: String)
 
 *Handled by userlist party.*
 
-Issues command with UserContract and UserState as output.
-
-#### UserContract
-
-The output state is UserState, no old username is reused; pass_hash starts with 000.
+Issues command with UserState as output.
 
 
 ### BearMixFlow(val login: String, val a_characteristics: Int, val b_characteristics: Int)
@@ -26,22 +22,14 @@ The output state is UserState, no old username is reused; pass_hash starts with 
 
 Mixes bears A and B to get a new C bear; generates a "random" D bear. Optionally (depending on *all* function inputs), another "random" E bear is generated.
 
-Issues command with BearMixContract; the old A's and B's BearStates are made historic, the new C's BearState and a new random D's/E's BearState are outputted.
-
-#### BearMixContract
-
-The two input states and the two/three output states are BearStates; the C, D and E bears are generated correctly.
+The old A's and B's BearStates are made historic, the new C's BearState and a new random D's/E's BearState are outputted.
 
 
 ### BearPresentFlow(val login_from: String, val characteristics: Int, val login_to: String)
 
 *Handled by all nodes.*
 
-Issues a command with BearPresentContract, and changes bear's owner.
-
-#### BearPresentContract
-
-The input and output state are BearStates; the input bear characteristics match the output bear.
+Changes bear's owner.
 
 
 ### BearIssueFlow(val login: String)
@@ -49,10 +37,6 @@ The input and output state are BearStates; the input bear characteristics match 
 *Handled by all nodes.*
 
 Creates 100 bears. The userlist party must contain exactly one user registered.
-
-#### BearIssueContract
-
-The output state is a BearState.
 
 
 ## User registration
