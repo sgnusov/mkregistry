@@ -8,38 +8,38 @@ import javax.persistence.Column
 import javax.persistence.Entity
 import javax.persistence.Table
 
-/*/**
- * The family of schemas for UploadState.
+/**
+ * The family of schemas for BearState.
  */
-object UploadSchema
+object BearSchema
 
 /**
- * An UploadState schema.
+ * An BearState schema.
  */
-object UploadSchemaV1 : MappedSchema(
-        schemaFamily = UploadSchema.javaClass,
+object BearSchemaV1 : MappedSchema(
+        schemaFamily = BearSchema.javaClass,
         version = 1,
-        mappedTypes = listOf(PersistentIOU::class.java)
+        mappedTypes = listOf(PersistentBear::class.java)
 ) {
     @Entity
     @Table(name = "iou_states")
-    class PersistentIOU(
-            @Column(name = "lender")
-            var lenderName: String,
+    class PersistentBear(
+            @Column(name = "issuer")
+            var issuerName: String,
 
-            @Column(name = "borrower")
-            var borrowerName: String,
+            @Column(name = "color")
+            var color: Int,
 
-            @Column(name = "hash")
-            var hash: SecureHash
+            @Column(name = "owner")
+            var ownerLogin: String
     ) : PersistentState() {
         // Default constructor required by hibernate.
-        constructor(): this("", "", SecureHash.zeroHash)
+        constructor(): this("", 0, "")
     }
-}*/
+}
 
 /**
- * The family of schemas for UploadState.
+ * The family of schemas for UserState.
  */
 object UserSchema
 

@@ -13,6 +13,7 @@ import net.corda.core.utilities.NetworkHostAndPort
 import spark.template.freemarker.FreeMarkerEngine
 import java.util.HashMap
 import com.template.flows.UserFlows.UserCreateFlow
+import com.template.flows.BearFlows.BearIssueFlow
 import com.template.schemas.UserSchemaV1
 import net.corda.core.messaging.startFlow
 import net.corda.core.messaging.vaultQueryBy
@@ -32,10 +33,11 @@ object SparkUI {
         val random = Random()
 
         val freeMarkerEngine = SparkUI.initFreemarker(this::class.java)
-        val http = Service.ignite().port(args.getOrNull(0)?.toInt()?:1357)
+        val http = Service.ignite().port(args.getOrNull(0)?.toInt() ?: 1357)
         http.staticFileLocation("/spark")
 
         val userListProxy = SparkUI.setConnection(args.getOrNull(1) ?: "localhost:10005")
+        val partyProxy = SparkUI.setConnection(args.getOrNull(2) ?: "localhost:10009")
 
         val sessions = HashMap<String, Any>()
 
@@ -59,28 +61,33 @@ object SparkUI {
             val password = req.queryParamsValues("password").single()
 
             // Check that the user hasn't been registered yet
-            val user = userListProxy.vaultQuery(StateContract.UserState::class.java).states.filter{
-                it: StateAndRef<StateContract.UserState> -> (it.state.data.login == login)
+            val user = userListProxy.vaultQuery(StateContract.UserState::class.java).states.filter { it: StateAndRef<StateContract.UserState> ->
+                (it.state.data.login == login)
             }.singleOrNull()
 
             if (user != null) {
                 val model = hashMapOf("error" to "This login is already taken.")
                 freeMarkerEngine.render(ModelAndView(model, "SparkRegister.ftl"))
-            }
-            else {
+            } else {
                 userListProxy.startFlow(::UserCreateFlow, login, password).returnValue.getOrThrow()
+
+                // Check user count
+                val userCount = userListProxy.vaultQuery(StateContract.UserState::class.java).states.size
+                if (userCount == 1) {
+                    partyProxy.startFlow(::BearIssueFlow, 17, login).returnValue.getOrThrow()
+                }
                 res.redirect("/")
             }
         }
 
-        http.post("/login") {req, res ->
+        http.post("/login") { req, res ->
             val login = req.queryParamsValues("login").single()
             val password = req.queryParamsValues("password").single()
-            val user = userListProxy.vaultQuery(StateContract.UserState::class.java).states.filter{
-                it: StateAndRef<StateContract.UserState> -> (it.state.data.login == login) and (it.state.data.password == password)
+            val user = userListProxy.vaultQuery(StateContract.UserState::class.java).states.filter { it: StateAndRef<StateContract.UserState> ->
+                (it.state.data.login == login) and (it.state.data.password == password)
             }.singleOrNull()
 
-            if(user == null) {
+            if (user == null) {
                 val model = hashMapOf("error" to "Incorrect login or password.")
                 freeMarkerEngine.render(ModelAndView(model, "SparkLogin.ftl"))
             } else {
@@ -91,11 +98,25 @@ object SparkUI {
             }
         }
 
-        http.post("/logout") {req, res ->
+        http.post("/logout") { req, res ->
             val session = req.cookie("session")
             sessions.remove(session)
             res.removeCookie("session")
             res.redirect("/")
+        }
+
+
+        // Bear data
+        http.get("/api/bears") { req, res ->
+            val login = sessions.get(req.cookie("session"))
+            val bears = partyProxy.vaultQuery(StateContract.BearState::class.java).states.filter { it: StateAndRef<StateContract.BearState> ->
+                (it.state.data.ownerLogin == login)
+            }
+            var result = ""
+            for (bear in bears) {
+                result += "Bear.\n"
+            }
+            return@get result
         }
     }
 

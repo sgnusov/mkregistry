@@ -1,6 +1,7 @@
 package com.template.states
 
 import com.template.schemas.UserSchemaV1
+import com.template.schemas.BearSchemaV1
 import net.corda.core.contracts.ContractState
 import net.corda.core.contracts.LinearState
 import net.corda.core.contracts.UniqueIdentifier
@@ -22,40 +23,24 @@ import javax.management.Query
 // * State *
 // *********
 object StateContract {
-    class UploadState(val hash: SecureHash,
-                      val lender: Party,
-                      val borrower: Party) : ContractState {
-        override val participants get() = listOf(lender, borrower)
+    class BearState(val color: Int,
+                    val ownerLogin: String,
+                    val issuer: Party) : ContractState, QueryableState {
+        override val participants get() = listOf(issuer)
 
 
-        /*override fun generateMappedObject(schema: MappedSchema): PersistentState {
+        override fun generateMappedObject(schema: MappedSchema): PersistentState {
             return when (schema) {
-                is UploadSchemaV1 -> UploadSchemaV1.PersistentIOU(
-                        this.lender.name.toString(),
-                        this.borrower.name.toString(),
-                        this.hash
+                is BearSchemaV1 -> BearSchemaV1.PersistentBear(
+                        this.issuer.name.toString(),
+                        this.color,
+                        this.ownerLogin
                 )
                 else -> throw IllegalArgumentException("Unrecognised schema $schema")
             }
         }
 
-        override fun supportedSchemas(): Iterable<MappedSchema> = listOf(UploadSchemaV1)*/
-    }
-
-    class SendState(val hash: SecureHash,
-                    val name: String,
-                    val description: String,
-                    val lender: Party,
-                    val borrower: Party) : ContractState {
-        override val participants get() = listOf(lender, borrower)
-    }
-
-    class MarkState(val hash: SecureHash,
-                    val name: String,
-                    val mark: Int,
-                    val lender: Party,
-                    val borrower: Party) : ContractState {
-        override val participants get() = listOf(lender, borrower)
+        override fun supportedSchemas(): Iterable<MappedSchema> = listOf(BearSchemaV1)
     }
 
     class UserState(val login: String,

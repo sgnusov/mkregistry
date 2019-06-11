@@ -2,7 +2,7 @@ package com.template.flows
 
 import co.paralleluniverse.fibers.Suspendable
 import com.sun.org.apache.xpath.internal.operations.Bool
-import com.template.contracts.UploadContract
+import com.template.contracts.BearContract
 import com.template.contracts.UserContract
 import com.template.states.StateContract
 import net.corda.core.contracts.Command
@@ -35,7 +35,6 @@ object UserFlows
             val txBuilder = TransactionBuilder(notary)
                     .addOutputState(userState, "com.template.contracts.UserContract")
                     .addCommand(txCommand)
-
             txBuilder.verify(serviceHub)
 
             val signedTx = serviceHub.signInitialTransaction(txBuilder)
