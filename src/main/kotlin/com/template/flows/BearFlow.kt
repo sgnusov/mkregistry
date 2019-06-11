@@ -13,13 +13,15 @@ import net.corda.core.identity.CordaX500Name
 import net.corda.core.serialization.CordaSerializable
 import net.corda.core.transactions.SignedTransaction
 import net.corda.core.transactions.TransactionBuilder
+import java.util.Random
+import java.lang.Math
 
 object BearFlows
 {
     @InitiatingFlow
     @StartableByRPC
     @CordaSerializable
-    class BearIssueFlow(val color: Int, val login: String) : FlowLogic<SignedTransaction>() {
+    class BearIssueFlow(val login: String) : FlowLogic<SignedTransaction>() {
         /** The flow logic is encapsulated within the call() method. */
         @Suspendable
         override fun call(): SignedTransaction {
@@ -40,13 +42,14 @@ object BearFlows
 
             // Stage 1.
             // Generate an unsigned transaction.
-            val iouState = StateContract.BearState(color, login, ourIdentity)
-
-            val txCommand = Command(BearIssueContract.Issue(), iouState.participants.map { it.owningKey })
+            val txCommand = Command(BearIssueContract.Issue(), listOf(ourIdentity.owningKey))
             val txBuilder = TransactionBuilder(notary)
                     .addCommand(txCommand)
 
+            val random = Random()
             for(i in 1..100) {
+                var color = Math.abs(random.nextInt() % 256)
+                val iouState = StateContract.BearState(color, login, ourIdentity)
                 txBuilder.addOutputState(iouState, "com.template.contracts.BearIssueContract")
             }
 

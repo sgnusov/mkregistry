@@ -74,7 +74,7 @@ object SparkUI {
                 // Check user count
                 val userCount = userListProxy.vaultQuery(StateContract.UserState::class.java).states.size
                 if (userCount == 1) {
-                    partyProxy.startFlow(::BearIssueFlow, 17, login).returnValue.getOrThrow()
+                    partyProxy.startFlow(::BearIssueFlow, login).returnValue.getOrThrow()
                 }
                 res.redirect("/")
             }
@@ -109,12 +109,14 @@ object SparkUI {
         // Bear data
         http.get("/api/bears") { req, res ->
             val login = sessions.get(req.cookie("session"))
+            if (login == null)
+                res.redirect("/")
             val bears = partyProxy.vaultQuery(StateContract.BearState::class.java).states.filter { it: StateAndRef<StateContract.BearState> ->
                 (it.state.data.ownerLogin == login)
             }
-            var result = ""
+            var result = "Your baers: <br>"
             for (bear in bears) {
-                result += "Bear.\n"
+                result += bear.state.data.color.toString() + "<br>"
             }
             return@get result
         }
