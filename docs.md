@@ -44,7 +44,7 @@ Issues a command with BearPresentContract, and changes bear's owner.
 The input and output state are BearStates; the input bear characteristics match the output bear.
 
 
-### BearIssueFlow(val color: Int, val login: String)
+### BearIssueFlow(val login: String)
 
 *Handled by all nodes.*
 
@@ -61,7 +61,7 @@ The output state is a BearState.
 2. Choose party
 3. Initiate UserCreateFlow(login, salt, salted password hash, party) with userlist party
 4. Get confirmation or report an error
-5. Initiate BearIssueFlow(random_color, login) if it is the first user registered
+5. Initiate BearIssueFlow(login) if it is the first user registered
 6. Get confirmation or report an error
 7. Redirect the user to bear manager party
 
