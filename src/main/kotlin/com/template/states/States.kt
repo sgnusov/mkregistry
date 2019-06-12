@@ -28,7 +28,6 @@ object StateContract {
                     val issuer: Party) : ContractState, QueryableState {
         override val participants get() = listOf(issuer)
 
-
         override fun generateMappedObject(schema: MappedSchema): PersistentState {
             return when (schema) {
                 is BearSchemaV1 -> BearSchemaV1.PersistentBear(
