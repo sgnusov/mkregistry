@@ -9,9 +9,9 @@
 
 ## Flows
 
-### UserCreateFlow(val login: String, val salt: String, val pass_hash: String, val party: String)
+### UserCreateFlow(val login: String, val salt: String, val pass_hash: String, val partyAddress: String, val partyKey: byte[])
 
-*Handled by userlist party.*
+*Handled by all nodes, singed by userlist party.*
 
 Issues command with UserState as output.
 

@@ -32,7 +32,7 @@ object NodeDriver {
 
             //*/
 
-            SparkUI.main(arrayOf("1234", "localhost:10005", "localhost:10009"))
+            SparkUI.main(arrayOf("1234", "localhost:10005"))
 
             ///*
             // SparkUpload.main(arrayOf("2345", "localhost:10009", "localhost:10005"))

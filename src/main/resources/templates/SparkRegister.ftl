@@ -12,6 +12,7 @@
             <input type="hidden" name="nonce" id="nonce">
             Login: <input type="text" name="login" id="login"><br>
             Password: <input type="text" name="password" id="password"><br>
+            Party: <input type="text" name="party" value="127.0.0.1:10009"><br>
             PoW: <input type="button" id="nonceButton" onclick="generateNonce()" value="Generate nonce (this might take some time)"><br>
             <input type="submit" value="Register" onclick="return register()"> ${error}
         </form>

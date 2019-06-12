@@ -28,7 +28,11 @@ import net.corda.core.utilities.getOrThrow
 import java.util.Random
 import java.security.MessageDigest
 
+data class Session(val login: String, val partyAddress: String)
+
 object SparkUI {
+    private val sessions: MutableMap<String, Session> = HashMap()
+    private val partyProxies: MutableMap<String, CordaRPCOps> = HashMap<String, CordaRPCOps>()
 
     @JvmStatic
     fun main(args: Array<String>) {
@@ -39,22 +43,20 @@ object SparkUI {
         http.staticFileLocation("/spark")
 
         val userListProxy = SparkUI.setConnection(args.getOrNull(1) ?: "localhost:10005")
-        val partyProxy = SparkUI.setConnection(args.getOrNull(2) ?: "localhost:10009")
-
-        val sessions = HashMap<String, Any>()
 
         http.get("/") { req, _ ->
             val session = req.cookie("session")
-            if (session == null || sessions.get(session) == null) {
+            if (session == null || sessions[session] == null) {
                 val model = hashMapOf("error" to "")
                 freeMarkerEngine.render(ModelAndView(model, "SparkLogin.ftl"))
             } else {
-                val login = sessions.get(session)
-                val model = hashMapOf("login" to login)
+                val login = sessions[session]!!.login
+                val partyProxy = SparkUI.getPartyProxy(sessions.get(session)!!.partyAddress)
+                val model: HashMap<String, Any> = hashMapOf("login" to login)
                 // Load & add bears to model
                 model["bears"] = partyProxy.vaultQuery(StateContract.BearState::class.java).states.filter { it: StateAndRef<StateContract.BearState> ->
                     (it.state.data.ownerLogin == login)
-                }.map { it.state.data }
+                }.map { it: StateAndRef<StateContract.BearState> -> it.state.data }
                 freeMarkerEngine.render(ModelAndView(model, "SparkHome.ftl"))
             }
         }
@@ -67,7 +69,7 @@ object SparkUI {
             val login = req.queryParamsValues("login").single()
             val password = req.queryParamsValues("password").single()
             val nonce = req.queryParamsValues("nonce").single()
-
+            val partyAddress = req.queryParamsValues("party").single()
             val nonceInt = nonce.toInt(radix=16)
 
             val loginHash = MessageDigest.getInstance("SHA-256").digest(login.toByteArray())
@@ -93,11 +95,17 @@ object SparkUI {
                     val model = hashMapOf("error" to "This login is already taken.")
                     freeMarkerEngine.render(ModelAndView(model, "SparkRegister.ftl"))
                 } else {
-                    userListProxy.startFlow(::UserCreateFlow, login, password).returnValue.getOrThrow()
+                    val partyProxy = this.getPartyProxy(partyAddress)
+                    try {
+                        partyProxy.startFlow(::UserCreateFlow, login, password, partyAddress).returnValue.getOrThrow()
+                    } catch (e: Exception) {
+                        return@post e.toString()
+                    }
 
                     // Check user count
                     val userCount = userListProxy.vaultQuery(StateContract.UserState::class.java).states.size
                     if (userCount == 1) {
+                        val partyProxy = SparkUI.getPartyProxy(partyAddress)
                         partyProxy.startFlow(::BearIssueFlow, login).returnValue.getOrThrow()
                     }
                     res.redirect("/")
@@ -117,7 +125,7 @@ object SparkUI {
                 freeMarkerEngine.render(ModelAndView(model, "SparkLogin.ftl"))
             } else {
                 val session = (random.nextInt() % 899999 + 100000).toString()
-                sessions[session] = login
+                sessions[session] = Session(login, user.state.data.partyAddress)
                 res.cookie("session", session)
                 res.redirect("/")
             }
@@ -133,7 +141,8 @@ object SparkUI {
 
         // Bear data
         http.get("/api/bears") { req, res ->
-            val login = sessions.get(req.cookie("session"))
+            val login = sessions[req.cookie("session")]!!.login
+            val partyProxy = SparkUI.getPartyProxy(sessions[req.cookie("session")]!!.partyAddress)
             if (login == null) {
                 res.redirect("/")
             } else {
@@ -148,7 +157,8 @@ object SparkUI {
             }
         }
         http.post("/api/present") { req, res ->
-            val login = sessions.get(req.cookie("session")) as String
+            val login = sessions[req.cookie("session")]!!.login
+            val partyProxy = SparkUI.getPartyProxy(sessions[req.cookie("session")]!!.partyAddress)
             val color = req.queryParamsValues("color").single().toInt()
             val receiverLogin = req.queryParamsValues("receiver").single()
             // Check that we have this bear
@@ -176,5 +186,12 @@ object SparkUI {
         val rpcConnection = CordaRPCClient(nodeAddress).start(username, password)
 
         return rpcConnection.proxy
+    }
+
+    fun getPartyProxy(hostAndPort: String): CordaRPCOps
+    {
+        val proxy = this.partyProxies[hostAndPort] ?: SparkUI.setConnection(hostAndPort)
+        this.partyProxies[hostAndPort] = proxy
+        return proxy
     }
 }
