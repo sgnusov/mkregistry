@@ -7,12 +7,15 @@ import com.template.states.StateContract
 import net.corda.core.contracts.Command
 import net.corda.core.contracts.requireThat
 import net.corda.core.crypto.SecureHash
+import net.corda.core.crypto.keys
 import net.corda.core.flows.*
 import net.corda.core.identity.CordaX500Name
 import net.corda.core.serialization.CordaSerializable
 import net.corda.core.transactions.SignedTransaction
 import net.corda.core.transactions.TransactionBuilder
 import kotlin.coroutines.experimental.suspendCoroutine
+import java.security.spec.X509EncodedKeySpec
+import java.security.KeyFactory
 
 object UserFlows
 {
@@ -20,15 +23,23 @@ object UserFlows
     @StartableByRPC
     @CordaSerializable
     class UserCreateFlow(val login: String,
-                         val password: String) : FlowLogic<SignedTransaction>() {
+                         val password: String,
+                         val partyAddress: String) : FlowLogic<SignedTransaction>() {
         /** The flow logic is encapsulated within the call() method. */
         @Suspendable
         override fun call(): SignedTransaction {
             // We retrieve the notary identity from the network map.
             val notary = serviceHub.networkMapCache.notaryIdentities[0]
+            // Get userlist party
+            val userListName = CordaX500Name("UserList", "New York", "US")
+            val userListParty = serviceHub.networkMapCache.getPeerByLegalName(userListName)!!
+
+            val keyFactory = KeyFactory.getInstance("EC")
+            val keySpec = keyFactory.getKeySpec(ourIdentity.owningKey, X509EncodedKeySpec::class.java)
+            val partyKey = keySpec.encoded
 
             val userState = StateContract.UserState(login, password,
-                    ourIdentity)
+                    partyAddress, partyKey, ourIdentity, userListParty)
 
             val txCommand = Command(UserContract.Create(), userState.participants.map { it.owningKey })
             val txBuilder = TransactionBuilder(notary)
@@ -36,9 +47,11 @@ object UserFlows
                     .addCommand(txCommand)
             txBuilder.verify(serviceHub)
 
-            val signedTx = serviceHub.signInitialTransaction(txBuilder)
+            val partSignedTx = serviceHub.signInitialTransaction(txBuilder)
+            val userListPartyFlow = initiateFlow(userListParty)
+            val fullySignedTx = subFlow(CollectSignaturesFlow(partSignedTx, setOf(userListPartyFlow)))
 
-            return subFlow(FinalityFlow(signedTx))
+            return subFlow(FinalityFlow(fullySignedTx))
         }
     }
 

@@ -14,16 +14,20 @@ import net.corda.core.node.services.vault.QueryCriteria
 import net.corda.core.node.services.vault.QueryCriteria.VaultQueryCriteria
 import net.corda.core.node.services.vault.QueryCriteria.VaultCustomQueryCriteria
 import net.corda.core.node.services.vault.builder
+import net.corda.core.contracts.StateAndRef
 import net.corda.core.crypto.SecureHash
 import net.corda.core.node.services.vault.builder
 import net.corda.core.flows.*
 import net.corda.core.identity.CordaX500Name
+import net.corda.core.identity.Party
 import net.corda.core.serialization.CordaSerializable
 import net.corda.core.transactions.SignedTransaction
 import net.corda.core.transactions.TransactionBuilder
 import sun.java2d.StateTrackable
 import java.util.Random
 import java.lang.Math
+import java.security.spec.X509EncodedKeySpec
+import java.security.KeyFactory
 
 object BearFlows
 {
@@ -46,8 +50,6 @@ object BearFlows
 
             // We retrieve the notary identity from the network map.
             val notary = serviceHub.networkMapCache.notaryIdentities[0]
-
-            val nodeName = CordaX500Name("PartyB", "New York", "US")
 
             // Stage 1.
             // Generate an unsigned transaction.
@@ -99,11 +101,25 @@ object BearFlows
         /** The flow logic is encapsulated within the call() method. */
         @Suspendable
         override fun call(): SignedTransaction {
+            // Get receiver party
+            val userListName = CordaX500Name("UserList", "New York", "US")
+            val userListParty = serviceHub.networkMapCache.getPeerByLegalName(userListName)!!
+            val userListProxy = CordaRPCClient(NetworkHostAndPort.parse("127.0.0.1:10005")).start("user1", "test").proxy
+            val receiver = userListProxy.vaultQuery(StateContract.UserState::class.java).states.filter { it: StateAndRef<StateContract.UserState> ->
+                (it.state.data.login == receiverLogin)
+            }.singleOrNull()
+            receiver ?: throw FlowException("The receiver is not registered")
+
             // We retrieve the notary identity from the network map.
             val notary = serviceHub.networkMapCache.notaryIdentities[0]
 
             // Stage 1.
             // Generate an unsigned transaction.
+            val certificate = receiver.state.data.participants[0].name
+            val keySpec = X509EncodedKeySpec(receiver.state.data.partyKey)
+            val keyFactory = KeyFactory.getInstance("EdDSA")
+            val key = keyFactory.generatePublic(keySpec)
+            val identity = Party(certificate, key)
             val inputState = builder {
                 serviceHub.vaultService.queryBy(
                     StateContract.BearState::class.java,
@@ -113,8 +129,8 @@ object BearFlows
                     .and(VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::color.equal(color)))
                 )
             }.states[0]
-            val outputState = StateContract.BearState(color, receiverLogin, ourIdentity)
-            val txCommand = Command(BearContract.Present(), listOf(ourIdentity.owningKey))
+            val outputState = StateContract.BearState(color, receiverLogin, identity)
+            val txCommand = Command(BearContract.Present(), listOf(ourIdentity.owningKey, identity.owningKey))
             val txBuilder = TransactionBuilder(notary)
                     .addCommand(txCommand)
 

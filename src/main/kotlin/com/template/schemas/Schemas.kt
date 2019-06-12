@@ -57,17 +57,29 @@ object UserSchemaV1 : MappedSchema(
             @Column(name = "registerer")
             var registererName: String,
 
+            @Column(name = "userlist")
+            var userlistName: String,
+
             @Column(name = "login")
             var login: String,
 
             @Column(name = "password")
-            var password: String
+            var password: String,
+
+            @Column(name = "party")
+            var partyAddress: String,
+
+            @Column(name = "partyKey")
+            var partyKey: ByteArray
     ) : PersistentState() {
         // Default constructor required by hibernate.
         constructor(): this(
                 "",
                 "",
-                ""
+                "",
+                "",
+                "",
+                ByteArray(0)
         )
     }
 }

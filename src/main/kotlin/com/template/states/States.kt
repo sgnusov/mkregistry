@@ -44,15 +44,21 @@ object StateContract {
 
     class UserState(val login: String,
                     val password: String,
-                    val registerer: Party): ContractState, QueryableState {
-        override val participants get() = listOf(registerer)
+                    val partyAddress: String,
+                    val partyKey: ByteArray,
+                    val registerer: Party,
+                    val userlist: Party): ContractState, QueryableState {
+        override val participants get() = listOf(registerer, userlist)
 
         override fun generateMappedObject(schema: MappedSchema): PersistentState {
             return when (schema) {
                 is UserSchemaV1 -> UserSchemaV1.PersistentUser(
                         this.registerer.name.toString(),
+                        this.userlist.name.toString(),
                         this.login,
-                        this.password
+                        this.password,
+                        this.partyAddress,
+                        this.partyKey
                 )
                 else -> throw IllegalArgumentException("Unrecognised schema $schema")
             }
