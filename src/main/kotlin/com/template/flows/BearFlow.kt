@@ -26,6 +26,7 @@ import java.util.Random
 import java.lang.Math
 import java.security.spec.X509EncodedKeySpec
 import java.security.KeyFactory
+import java.util.Base64
 
 object BearFlows
 {
@@ -114,11 +115,11 @@ object BearFlows
 
             // Stage 1.
             // Generate an unsigned transaction.
-            val certificate = receiver.state.data.participants[0].name
-            val keySpec = X509EncodedKeySpec(receiver.state.data.partyKey)
-            val keyFactory = KeyFactory.getInstance("EdDSA")
-            val key = keyFactory.generatePublic(keySpec)
-            val identity = Party(certificate, key)
+            val identity = Party(
+                receiver.state.data.participants[0].name,
+                KeyFactory.getInstance("EdDSA")
+                    .generatePublic(X509EncodedKeySpec(Base64.getDecoder().decode(receiver.state.data.partyKey)))
+            )
             val inputState = builder {
                 serviceHub.vaultService.queryBy(
                     StateContract.BearState::class.java,

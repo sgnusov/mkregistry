@@ -16,6 +16,7 @@ import net.corda.core.transactions.TransactionBuilder
 import kotlin.coroutines.experimental.suspendCoroutine
 import java.security.spec.X509EncodedKeySpec
 import java.security.KeyFactory
+import java.util.Base64
 
 object UserFlows
 {
@@ -34,9 +35,11 @@ object UserFlows
             val userListName = CordaX500Name("UserList", "New York", "US")
             val userListParty = serviceHub.networkMapCache.getPeerByLegalName(userListName)!!
 
-            val keyFactory = KeyFactory.getInstance("EC")
-            val keySpec = keyFactory.getKeySpec(ourIdentity.owningKey, X509EncodedKeySpec::class.java)
-            val partyKey = keySpec.encoded
+            val partyKey = Base64.getEncoder().encodeToString(
+                KeyFactory.getInstance("EC")
+                    .getKeySpec(ourIdentity.owningKey, X509EncodedKeySpec::class.java)
+                    .encoded
+            )
 
             val userState = StateContract.UserState(login, password,
                     partyAddress, partyKey, ourIdentity, userListParty)

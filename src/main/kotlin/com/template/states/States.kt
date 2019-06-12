@@ -46,7 +46,7 @@ object StateContract {
     class UserState(val login: String,
                     val password: String,
                     val partyAddress: String,
-                    val partyKey: ByteArray,
+                    val partyKey: String,
                     val registerer: Party,
                     val userlist: Party): ContractState, QueryableState {
         override val participants get() = listOf(registerer, userlist)

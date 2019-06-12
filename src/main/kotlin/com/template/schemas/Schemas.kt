@@ -70,7 +70,7 @@ object UserSchemaV1 : MappedSchema(
             var partyAddress: String,
 
             @Column(name = "partyKey")
-            var partyKey: ByteArray
+            var partyKey: String
     ) : PersistentState() {
         // Default constructor required by hibernate.
         constructor(): this(
@@ -79,7 +79,7 @@ object UserSchemaV1 : MappedSchema(
                 "",
                 "",
                 "",
-                ByteArray(0)
+                ""
         )
     }
 }
