@@ -14,6 +14,7 @@ class BearContract : Contract {
 
     class Issue : CommandData
     class Present : CommandData
+    class Mix : CommandData
 
     override fun verify(tx: LedgerTransaction) {
         requireThat {
