@@ -85,10 +85,43 @@ const API = new class API {
 			await sleep(1000);
 			return true;
 		}
-		const res = await this.call("present");
+		const res = await this.call("present", "POST", {
+			receiver: login,
+			color: bear.color
+		});
 		if(res !== "") {
 			throw new Error(res);
 		}
 		return true;
+	}
+	async changeKey(bear) {
+		if(IS_LOCAL) {
+			await sleep(1000);
+			return Math.random().toString(16).substr(2);
+		}
+		const res = await this.callMap("swap/initialize", "POST", {
+			color: bear.color
+		});
+		if(res.error) {
+			throw new Error(res.error);
+		}
+		return res.key;
+	}
+	async exchange(bear, login, key) {
+		if(IS_LOCAL) {
+			await sleep(1000);
+			return {
+				color: 123
+			};
+		}
+		const res = await this.callMap("swap/finalize", "POST", {
+			login,
+			key,
+			color: bear.color
+		});
+		if(res.error) {
+			throw new Error(res.error);
+		}
+		return res;
 	}
 };
