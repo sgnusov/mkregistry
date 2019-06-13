@@ -1,0 +1,41 @@
+.bear-list {
+    display: flex;
+    height: 344px;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+}
+
+.bear-list .navigate {
+    height: 52px;
+    width: 52px;
+    border-radius: 50%;
+    background-color: #333;
+    color: #888;
+    border: none;
+    padding: 0;
+    font-size: 32px;
+    transition: all 0.1s;
+    cursor: pointer;
+}
+.bear-list .navigate:hover {
+    background-color: #338;
+}
+
+.bear-list .container {
+    overflow-x: hidden;
+    height: 100%;
+}
+.bear-list.big .container {
+    padding-bottom: 164px;
+    margin-top: 164px;
+}
+.bear-list .inner-container {
+    display: flex;
+    overflow: visible;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    margin-left: -132px;
+    margin-right: -132px;
+}

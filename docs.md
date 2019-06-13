@@ -9,7 +9,7 @@
 
 ## Flows
 
-### UserCreateFlow(val login: String, val salt: String, val pass_hash: String, val partyAddress: String, val partyKey: byte[])
+### UserCreateFlow(val login: String, val salt: String, val passHash: String, val partyAddress: String, val partyKey: String)
 
 *Handled by all nodes, singed by userlist party.*
 

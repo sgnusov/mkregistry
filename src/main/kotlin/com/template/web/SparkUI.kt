@@ -44,24 +44,17 @@ object SparkUI {
 
         val freeMarkerEngine = SparkUI.initFreemarker(this::class.java)
         val http = Service.ignite().port(args.getOrNull(0)?.toInt() ?: 1357)
-        http.staticFileLocation("/spark")
+        http.staticFileLocation("/static")
 
         val userListProxy = SparkUI.setConnection(args.getOrNull(1) ?: "localhost:10005")
 
-        http.get("/") { req, _ ->
+        http.get("/") { req, res ->
             val session = req.cookie("session")
             if (session == null || sessions[session] == null) {
                 val model = hashMapOf("error" to "")
                 freeMarkerEngine.render(ModelAndView(model, "SparkLogin.ftl"))
             } else {
-                val login = sessions[session]!!.login
-                val partyProxy = SparkUI.getPartyProxy(sessions.get(session)!!.partyAddress)
-                val model: HashMap<String, Any> = hashMapOf("login" to login, "error" to "")
-                // Load & add bears to model
-                model["bears"] = partyProxy.vaultQuery(StateContract.BearState::class.java).states.filter { it: StateAndRef<StateContract.BearState> ->
-                    (it.state.data.ownerLogin == login)
-                }.map { it: StateAndRef<StateContract.BearState> -> it.state.data }
-                freeMarkerEngine.render(ModelAndView(model, "SparkHome.ftl"))
+                res.redirect("/ui.html")
             }
         }
 
@@ -147,18 +140,18 @@ object SparkUI {
         http.get("/api/bears") { req, res ->
             val login = sessions[req.cookie("session")]!!.login
             val partyProxy = SparkUI.getPartyProxy(sessions[req.cookie("session")]!!.partyAddress)
-            if (login == null) {
-                res.redirect("/")
-            } else {
-                val bears = partyProxy.vaultQuery(StateContract.BearState::class.java).states.filter { it: StateAndRef<StateContract.BearState> ->
-                    (it.state.data.ownerLogin == login)
-                }
-                var result = "Your bears: <br>"
-                for (bear in bears) {
-                    result += bear.state.data.color.toString() + "<br>"
-                }
-                return@get result
+            val bears = partyProxy.vaultQuery(StateContract.BearState::class.java).states.filter { it: StateAndRef<StateContract.BearState> ->
+                (it.state.data.ownerLogin == login)
             }
+            return@get (bears.map { "color=${it.state.data.color}" }).joinToString("\n")
+        }
+
+        http.get("/api/user") { req, res ->
+            val login = sessions[req.cookie("session")]!!.login
+            val user = userListProxy.vaultQuery(StateContract.UserState::class.java).states.filter { it: StateAndRef<StateContract.UserState> ->
+                it.state.data.login == login
+            }.single().state.data
+            return@get "login=${user.login},partyAddress=${user.partyAddress}"
         }
 
         http.post("/api/present") { req, res ->
@@ -231,6 +224,9 @@ object SparkUI {
             // Initiate BearSwapFlow
             partyProxy.startFlow(::BearSwapFlow, login, friendLogin, color, key).returnValue.getOrThrow()
             res.redirect("/")
+        }
+
+        http.get("/api/whoami") { req, res ->
         }
     }
 
