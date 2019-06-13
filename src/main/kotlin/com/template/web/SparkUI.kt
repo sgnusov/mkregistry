@@ -15,6 +15,7 @@ import java.util.HashMap
 import com.template.flows.UserFlows.UserCreateFlow
 import com.template.flows.BearFlows.BearIssueFlow
 import com.template.flows.BearFlows.BearPresentFlow
+import com.template.flows.BearFlows.BearMixFlow
 import com.template.schemas.UserSchemaV1
 import net.corda.core.messaging.startFlow
 import net.corda.core.messaging.vaultQueryBy
@@ -52,7 +53,7 @@ object SparkUI {
             } else {
                 val login = sessions[session]!!.login
                 val partyProxy = SparkUI.getPartyProxy(sessions.get(session)!!.partyAddress)
-                val model: HashMap<String, Any> = hashMapOf("login" to login)
+                val model: HashMap<String, Any> = hashMapOf("login" to login, "error" to "")
                 // Load & add bears to model
                 model["bears"] = partyProxy.vaultQuery(StateContract.BearState::class.java).states.filter { it: StateAndRef<StateContract.BearState> ->
                     (it.state.data.ownerLogin == login)
@@ -156,6 +157,7 @@ object SparkUI {
                 return@get result
             }
         }
+
         http.post("/api/present") { req, res ->
             val login = sessions[req.cookie("session")]!!.login
             val partyProxy = SparkUI.getPartyProxy(sessions[req.cookie("session")]!!.partyAddress)
@@ -169,6 +171,26 @@ object SparkUI {
             partyProxy.startFlow(::BearPresentFlow, login, receiverLogin, color).returnValue.getOrThrow()
             res.redirect("/")
         }
+
+         http.post("/api/mix") { req, res ->
+            val login = sessions.get(req.cookie("session")) as String
+            val color1 = req.queryParamsValues("color1").single().toInt()
+            val color2 = req.queryParamsValues("color2").single().toInt()
+            // Check that we have this bears
+            val bear1 = partyProxy.vaultQuery(StateContract.BearState::class.java).states.filter { it: StateAndRef<StateContract.BearState> ->
+                (it.state.data.ownerLogin == login && it.state.data.color == color1)
+            }[0]
+            val bear2 = partyProxy.vaultQuery(StateContract.BearState::class.java).states.filter { it: StateAndRef<StateContract.BearState> ->
+                (it.state.data.ownerLogin == login && it.state.data.color == color2)
+            }[0]
+            // Initiate BearPresentFlow
+            val result = partyProxy.startFlow(::BearMixFlow, login, color1, color2).returnValue.getOrThrow()
+            val newBear = result.tx.outputStates[0] as StateContract.BearState
+
+            val model = hashMapOf("color" to newBear.color)
+            freeMarkerEngine.render(ModelAndView(model, "SparkNewBear.ftl"))
+        }
+
     }
 
     fun initFreemarker(resourceLoaderClass: Class<*>): FreeMarkerEngine
