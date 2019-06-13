@@ -23,6 +23,8 @@ import net.corda.core.identity.Party
 import net.corda.core.serialization.CordaSerializable
 import net.corda.core.transactions.SignedTransaction
 import net.corda.core.transactions.TransactionBuilder
+import net.corda.core.node.StatesToRecord
+import net.corda.core.utilities.unwrap
 import sun.java2d.StateTrackable
 import java.util.Random
 import java.lang.Math
@@ -420,6 +422,13 @@ object BearFlows
                     .and(VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::color.equal(color)))
                 )
             }.states[0]
+
+            // Load friend's bear
+            val friendFlow = initiateFlow(identity)
+            friendFlow.send(friendLogin)
+            friendFlow.send(keyHash)
+            subFlow(ReceiveTransactionFlow(friendFlow, true, StatesToRecord.ALL_VISIBLE))
+
             val inputFriendBear = builder {
                 identityProxy.vaultQueryByCriteria<StateContract.BearState>(
                     VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)
@@ -433,22 +442,20 @@ object BearFlows
 
             val txCommand = Command(BearContract.Present(), listOf(ourIdentity.owningKey, identity.owningKey))
             val txBuilder = TransactionBuilder(notary)
-                    .addCommand(txCommand)
+                .addCommand(txCommand)
             txBuilder.addInputState(inputUserBear)
             txBuilder.addInputState(inputFriendBear)
             txBuilder.addOutputState(outputUserBear, "com.template.contracts.BearContract")
             txBuilder.addOutputState(outputFriendBear, "com.template.contracts.BearContract")
+
             // Stage 2.
-            // Verify that the transaction is valid.
-            txBuilder.verify(serviceHub)
+            // Sign the transaction.
+            val partSignedTx = serviceHub.signInitialTransaction(txBuilder)
+            val fullySignedTx = subFlow(CollectSignaturesFlow(partSignedTx, setOf(friendFlow)))
 
             // Stage 3.
-            // Sign the transaction.
-            val signedTx = serviceHub.signInitialTransaction(txBuilder)
-
-            // Stage 4.
             // Notarise and record the transaction in both parties' vaults.
-            return subFlow(FinalityFlow(signedTx))
+            return subFlow(FinalityFlow(fullySignedTx))
         }
     }
 
@@ -456,6 +463,22 @@ object BearFlows
     class BearSwapFlowResponder(val otherPartySession: FlowSession) : FlowLogic<SignedTransaction>() {
         @Suspendable
         override fun call() : SignedTransaction {
+            val login = otherPartySession.receive<String>().unwrap { it }
+            val keyHash = otherPartySession.receive<String>().unwrap { it }
+
+            val states = builder {
+                serviceHub.vaultService.queryBy(
+                        StateContract.BearState::class.java,
+                        criteria =
+                        VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)
+                                .and(VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::ownerLogin.equal(login)))
+                                .and(VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::keyHash.equal(keyHash)))
+                )
+            }.states
+            val txhash = states[0].ref.txhash
+            val stx = serviceHub.validatedTransactions.getTransaction(txhash)!!
+            subFlow(SendTransactionFlow(otherPartySession, stx))
+
             val signTransactionFlow = object : SignTransactionFlow(otherPartySession) {
                 override fun checkTransaction(stx: SignedTransaction) = requireThat {
                     val ledgerTx = stx.toLedgerTransaction(serviceHub, false)
