@@ -172,7 +172,7 @@ object SparkUI {
             res.redirect("/")
         }
 
-         http.post("/api/mix") { req, res ->
+        http.post("/api/mix") { req, res ->
             val login = sessions[req.cookie("session")]!!.login
             val partyProxy = SparkUI.getPartyProxy(sessions[req.cookie("session")]!!.partyAddress)
             val color1 = req.queryParamsValues("color1").single().toInt()
@@ -191,7 +191,6 @@ object SparkUI {
             val model = hashMapOf("color" to newBear.color)
             freeMarkerEngine.render(ModelAndView(model, "SparkNewBear.ftl"))
         }
-
     }
 
     fun initFreemarker(resourceLoaderClass: Class<*>): FreeMarkerEngine
