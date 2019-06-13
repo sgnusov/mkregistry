@@ -9,7 +9,12 @@ const API = new class API {
 	async call(action, method="POST", args={}) {
 		const result = await fetch(`/api/${action}`, {
 			method,
-			data: Object.keys(args).map(key => `${key}=${args[key]}`).join("&")
+			body: method === "POST"
+				? Object.keys(args).map(key => `${key}=${args[key]}`).join("&")
+				: null,
+			headers: {
+				"Content-Type": "application/x-www-form-urlencoded"
+			}
 		});
 		return result.text();
 	}
