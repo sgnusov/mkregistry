@@ -24,10 +24,10 @@ object NodeDriver {
             ///*
             startNode(providedName = CordaX500Name("PartyA", "London", "GB"), rpcUsers = rpcUsers).getOrThrow()
             startNode(providedName = CordaX500Name("PartyB", "New York", "US"), rpcUsers = rpcUsers).getOrThrow()
-            startNode(providedName = CordaX500Name("PartyC", "New York", "US"), rpcUsers = rpcUsers).getOrThrow()
-            startNode(providedName = CordaX500Name("PartyD", "New York", "US"), rpcUsers = rpcUsers).getOrThrow()
-            startNode(providedName = CordaX500Name("PartyE", "New York", "US"), rpcUsers = rpcUsers).getOrThrow()
-            startNode(providedName = CordaX500Name("PartyF", "New York", "US"), rpcUsers = rpcUsers).getOrThrow()
+            //startNode(providedName = CordaX500Name("PartyC", "New York", "US"), rpcUsers = rpcUsers).getOrThrow()
+            //startNode(providedName = CordaX500Name("PartyD", "New York", "US"), rpcUsers = rpcUsers).getOrThrow()
+            //startNode(providedName = CordaX500Name("PartyE", "New York", "US"), rpcUsers = rpcUsers).getOrThrow()
+            //startNode(providedName = CordaX500Name("PartyF", "New York", "US"), rpcUsers = rpcUsers).getOrThrow()
             //*/
 
             //*/

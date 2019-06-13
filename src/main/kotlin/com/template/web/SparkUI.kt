@@ -173,7 +173,8 @@ object SparkUI {
         }
 
          http.post("/api/mix") { req, res ->
-            val login = sessions.get(req.cookie("session")) as String
+            val login = sessions[req.cookie("session")]!!.login
+            val partyProxy = SparkUI.getPartyProxy(sessions[req.cookie("session")]!!.partyAddress)
             val color1 = req.queryParamsValues("color1").single().toInt()
             val color2 = req.queryParamsValues("color2").single().toInt()
             // Check that we have this bears
