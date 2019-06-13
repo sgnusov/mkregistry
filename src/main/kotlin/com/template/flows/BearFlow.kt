@@ -144,11 +144,13 @@ object BearFlows
 
             // Stage 3.
             // Sign the transaction.
-            val signedTx = serviceHub.signInitialTransaction(txBuilder)
+            val partSignedTx = serviceHub.signInitialTransaction(txBuilder)
+            val identityFlow = initiateFlow(identity)
+            val fullySignedTx = subFlow(CollectSignaturesFlow(partSignedTx, setOf(identityFlow)))
 
             // Stage 4.
             // Notarise and record the transaction in both parties' vaults.
-            return subFlow(FinalityFlow(signedTx))
+            return subFlow(FinalityFlow(fullySignedTx))
         }
     }
 
@@ -158,7 +160,7 @@ object BearFlows
         override fun call() : SignedTransaction {
             val signTransactionFlow = object : SignTransactionFlow(otherPartySession) {
                 override fun checkTransaction(stx: SignedTransaction) = requireThat {
-                    val ledgerTx = stx.toLedgerTransaction(serviceHub)
+                    val ledgerTx = stx.toLedgerTransaction(serviceHub, false)
                     val input = ledgerTx.inputs.single().state.data
                     val output = ledgerTx.outputs.single().data
                     "This consumes a bear." using (input is StateContract.BearState)
@@ -193,10 +195,9 @@ object BearFlows
                         .and(QueryCriteria.VaultCustomQueryCriteria(UserSchemaV1.PersistentUser::login.equal(login))),
                         StateContract.UserState::class.java
                 )
-            }
-
-            if (users.states.size != 1) {
-                throw FlowException("Need one user, got ${users.states.size}")
+            }.states.singleOrNull()
+            if (users == null) {
+                throw FlowException("No such user")
             }
 
             val bears1 = builder {
@@ -265,7 +266,7 @@ object BearFlows
         override fun call() : SignedTransaction {
             val signTransactionFlow = object : SignTransactionFlow(otherPartySession) {
                 override fun checkTransaction(stx: SignedTransaction) = requireThat {
-                    val ledgerTx = stx.toLedgerTransaction(serviceHub)
+                    val ledgerTx = stx.toLedgerTransaction(serviceHub, false)
                     "This issues a bear." using (ledgerTx.outputs.single().data is StateContract.BearState)
                     val output = ledgerTx.outputs.single().data as  StateContract.BearState
                     "This consumes 2 inputs." using (ledgerTx.inputs.size == 2)
