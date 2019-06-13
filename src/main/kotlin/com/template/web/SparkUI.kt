@@ -220,8 +220,9 @@ object SparkUI {
                 (it.state.data.ownerLogin == login && it.state.data.color == color)
             }[0]
             // Initiate BearSwapFlow
-            partyProxy.startFlow(::BearSwapFlow, login, friendLogin, color, key).returnValue.getOrThrow()
-            return@post ""
+            val ret = partyProxy.startFlow(::BearSwapFlow, login, friendLogin, color, key).returnValue.getOrThrow()
+            val newBear = ret.coreTransaction.outputs.map { it.data as StateContract.BearState }.filter { it.ownerLogin == login }[0]
+            return@post "color=${newBear.color}"
         }
     }
 
