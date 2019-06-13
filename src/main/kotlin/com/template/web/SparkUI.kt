@@ -16,6 +16,8 @@ import com.template.flows.UserFlows.UserCreateFlow
 import com.template.flows.BearFlows.BearIssueFlow
 import com.template.flows.BearFlows.BearPresentFlow
 import com.template.flows.BearFlows.BearMixFlow
+import com.template.flows.BearFlows.BearKeyChangeFlow
+import com.template.flows.BearFlows.BearSwapFlow
 import com.template.schemas.UserSchemaV1
 import net.corda.core.messaging.startFlow
 import net.corda.core.messaging.vaultQueryBy
@@ -28,6 +30,7 @@ import net.corda.core.node.services.vault.*
 import net.corda.core.utilities.getOrThrow
 import java.util.Random
 import java.security.MessageDigest
+import java.util.Base64
 
 data class Session(val login: String, val partyAddress: String)
 
@@ -190,6 +193,44 @@ object SparkUI {
 
             val model = hashMapOf("color" to newBear.color)
             freeMarkerEngine.render(ModelAndView(model, "SparkNewBear.ftl"))
+        }
+
+        http.post("/api/swap/initialize") { req, res ->
+            val login = sessions[req.cookie("session")]!!.login
+            val partyProxy = SparkUI.getPartyProxy(sessions[req.cookie("session")]!!.partyAddress)
+            val color = req.queryParamsValues("color").single().toInt()
+            // Check that we have this bear
+            val bear = partyProxy.vaultQuery(StateContract.BearState::class.java).states.filter { it: StateAndRef<StateContract.BearState> ->
+                (it.state.data.ownerLogin == login && it.state.data.color == color)
+            }[0]
+            // Generate key
+            val key = (
+                (random.nextInt() and ((1 shl 16) - 1)).toString(16).padStart(4, ' ') +
+                (random.nextInt() and ((1 shl 16) - 1)).toString(16).padStart(4, ' ') +
+                (random.nextInt() and ((1 shl 16) - 1)).toString(16).padStart(4, ' ') +
+                (random.nextInt() and ((1 shl 16) - 1)).toString(16).padStart(4, ' ')
+            )
+            // Generate hash
+            val keyHash = Base64.getEncoder().encodeToString(MessageDigest.getInstance("SHA-256").digest(key.toByteArray()))
+            // Initiate BearKeyChangeFlow
+            partyProxy.startFlow(::BearKeyChangeFlow, login, color, keyHash).returnValue.getOrThrow()
+            val model = hashMapOf("key" to key)
+            freeMarkerEngine.render(ModelAndView(model, "SparkSwap.ftl"))
+        }
+
+        http.post("/api/swap/finalize") { req, res ->
+            val login = sessions[req.cookie("session")]!!.login
+            val partyProxy = SparkUI.getPartyProxy(sessions[req.cookie("session")]!!.partyAddress)
+            val friendLogin = req.queryParamsValues("login").single()
+            val color = req.queryParamsValues("color").single().toInt()
+            val key = req.queryParamsValues("key").single()
+            // Check that we have this bear
+            val bear = partyProxy.vaultQuery(StateContract.BearState::class.java).states.filter { it: StateAndRef<StateContract.BearState> ->
+                (it.state.data.ownerLogin == login && it.state.data.color == color)
+            }[0]
+            // Initiate BearSwapFlow
+            partyProxy.startFlow(::BearSwapFlow, login, friendLogin, color, key).returnValue.getOrThrow()
+            res.redirect("/")
         }
     }
 

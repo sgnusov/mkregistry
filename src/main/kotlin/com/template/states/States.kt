@@ -25,6 +25,7 @@ import javax.management.Query
 object StateContract {
     class BearState(val color: Int,
                     val ownerLogin: String,
+                    val keyHash: String,
                     val issuer: Party) : ContractState, QueryableState {
         override val participants get() = listOf(issuer)
 
@@ -33,6 +34,7 @@ object StateContract {
                 is BearSchemaV1 -> BearSchemaV1.PersistentBear(
                         this.issuer.name.toString(),
                         this.color,
+                        this.keyHash,
                         this.ownerLogin
                 )
                 else -> throw IllegalArgumentException("Unrecognised schema $schema")

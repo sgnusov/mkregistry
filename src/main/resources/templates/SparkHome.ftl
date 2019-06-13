@@ -18,6 +18,16 @@
             <#list bears as bear>
                 <li>
                     Color: ${bear.color}
+                    <form action="/api/swap/initialize" method="POST">
+                        <input type="hidden" name="color" value="${bear.color}">
+                        <button>Swap with friend</button>
+                    </form>
+                    <form action="/api/swap/finalize" method="POST">
+                        <input type="hidden" name="color" value="${bear.color}">
+                        <input type="text" name="login" placeholder="Login">
+                        <input type="text" name="key" placeholder="0123456789abcdef">
+                        <button>Swap with friend by key</button>
+                    </form>
                     <form action="/api/present" method="POST">
                         <input type="hidden" name="color" value="${bear.color}">
                         <input type="checkbox" data-color="${bear.color}" class="mixcheckbox">

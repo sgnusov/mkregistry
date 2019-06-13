@@ -30,11 +30,14 @@ object BearSchemaV1 : MappedSchema(
             @Column(name = "color")
             var color: Int,
 
+            @Column(name = "keyHash")
+            var keyHash: String,
+
             @Column(name = "owner")
             var ownerLogin: String
     ) : PersistentState() {
         // Default constructor required by hibernate.
-        constructor(): this("", 0, "")
+        constructor(): this("", 0, "", "")
     }
 }
 

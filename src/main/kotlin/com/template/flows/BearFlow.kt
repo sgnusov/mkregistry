@@ -28,6 +28,7 @@ import java.util.Random
 import java.lang.Math
 import java.security.spec.X509EncodedKeySpec
 import java.security.KeyFactory
+import java.security.MessageDigest
 import java.util.Base64
 
 object BearFlows
@@ -61,7 +62,7 @@ object BearFlows
             val random = Random()
             for (i in 1..100) {
                 var color = Math.abs(random.nextInt() % 256)
-                val iouState = StateContract.BearState(color, login, ourIdentity)
+                val iouState = StateContract.BearState(color, login, "", ourIdentity)
                 txBuilder.addOutputState(iouState, "com.template.contracts.BearContract")
             }
 
@@ -130,7 +131,7 @@ object BearFlows
                                 .and(VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::color.equal(color)))
                 )
             }.states[0]
-            val outputState = StateContract.BearState(color, receiverLogin, identity)
+            val outputState = StateContract.BearState(color, receiverLogin, "", identity)
             val txCommand = Command(BearContract.Present(), listOf(ourIdentity.owningKey, identity.owningKey))
             val txBuilder = TransactionBuilder(notary)
                     .addCommand(txCommand)
@@ -243,7 +244,7 @@ object BearFlows
                 .addInputState(bear2)
                 .addCommand(txCommand)
 
-            val bearState = StateContract.BearState((color1 + color2) / 2, login, ourIdentity)
+            val bearState = StateContract.BearState((color1 + color2) / 2, login, "", ourIdentity)
             txBuilder.addOutputState(bearState, "com.template.contracts.BearContract")
 
             // Stage 2.
@@ -274,6 +275,204 @@ object BearFlows
                     val bear1 = ledgerTx.inputs[0].state.data as StateContract.BearState
                     val bear2 = ledgerTx.inputs[1].state.data as StateContract.BearState
                     "This mixes correctly." using (output.color == (bear1.color + bear2.color) / 2)
+                }
+            }
+
+            return subFlow(signTransactionFlow)
+        }
+    }
+
+
+
+    @InitiatingFlow
+    @StartableByRPC
+    @CordaSerializable
+    class BearKeyChangeFlow(val login: String,
+                            val color: Int,
+                            val newKeyHash: String) : FlowLogic<SignedTransaction>() {
+        /** The flow logic is encapsulated within the call() method. */
+        @Suspendable
+        override fun call(): SignedTransaction {
+            // Ask the userlist party to make sure there is a single user registered
+            val userListName = CordaX500Name("UserList", "New York", "US")
+            val userListParty = serviceHub.networkMapCache.getPeerByLegalName(userListName)!!
+            val userListProxy = CordaRPCClient(NetworkHostAndPort.parse("127.0.0.1:10005")).start("user1", "test").proxy
+
+            // Check that there are no bears with same key
+            val isUnique = builder {
+                serviceHub.vaultService.queryBy(
+                    StateContract.BearState::class.java,
+                    criteria =
+                    VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)
+                    .and(VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::ownerLogin.equal(login)))
+                    .and(VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::keyHash.equal(newKeyHash)))
+                )
+            }.states.isEmpty()
+            if (!isUnique) {
+                throw FlowException("Key must be unique.")
+            }
+
+            val inputState = builder {
+                serviceHub.vaultService.queryBy(
+                    StateContract.BearState::class.java,
+                    criteria =
+                    VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)
+                    .and(VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::ownerLogin.equal(login)))
+                    .and(VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::color.equal(color)))
+                )
+            }.states[0]
+
+            val outputState = StateContract.BearState(
+                inputState.state.data.color,
+                inputState.state.data.ownerLogin,
+                newKeyHash,
+                inputState.state.data.issuer
+            )
+
+            // We retrieve the notary identity from the network map.
+            val notary = serviceHub.networkMapCache.notaryIdentities[0]
+
+            // Stage 1.
+            // Generate an unsigned transaction.
+            val txCommand = Command(BearContract.SwapInitialize(), listOf(ourIdentity.owningKey))
+            val txBuilder = TransactionBuilder(notary)
+                    .addCommand(txCommand)
+                    .addInputState(inputState)
+                    .addOutputState(outputState, "com.template.contracts.BearContract")
+
+            // Stage 2.
+            // Verify that the transaction is valid.
+            txBuilder.verify(serviceHub)
+
+            // Stage 3.
+            // Sign the transaction.
+            val signedTx = serviceHub.signInitialTransaction(txBuilder)
+
+            // Stage 4.
+            // Notarise and record the transaction in both parties' vaults.
+            return subFlow(FinalityFlow(signedTx))
+        }
+    }
+
+    @InitiatedBy(BearKeyChangeFlow::class)
+    class BearKeyChangeFlowResponder(val otherPartySession: FlowSession) : FlowLogic<SignedTransaction>() {
+        @Suspendable
+        override fun call() : SignedTransaction {
+            val signTransactionFlow = object : SignTransactionFlow(otherPartySession) {
+                override fun checkTransaction(stx: SignedTransaction) = requireThat {
+                    val ledgerTx = stx.toLedgerTransaction(serviceHub)
+                    val input = ledgerTx.inputs.single().state.data
+                    val output = ledgerTx.outputs.single().data
+                    "This consumes a bear." using (input is StateContract.BearState)
+                    "This issues a bear." using (output is StateContract.BearState)
+                    "The owner isn't changed." using (
+                        (input as StateContract.BearState).ownerLogin ==
+                        (output as StateContract.BearState).ownerLogin
+                    )
+                    "The characteristics aren't changed." using (
+                        (input as StateContract.BearState).color ==
+                        (output as StateContract.BearState).color
+                    )
+                }
+            }
+
+            return subFlow(signTransactionFlow)
+        }
+    }
+
+
+
+    @InitiatingFlow
+    @StartableByRPC
+    @CordaSerializable
+    class BearSwapFlow(val login: String, val friendLogin: String, val color: Int, val key: String) : FlowLogic<SignedTransaction>() {
+        /** The flow logic is encapsulated within the call() method. */
+        @Suspendable
+        override fun call(): SignedTransaction {
+            // Get friend party
+            val userListName = CordaX500Name("UserList", "New York", "US")
+            val userListParty = serviceHub.networkMapCache.getPeerByLegalName(userListName)!!
+            val userListProxy = CordaRPCClient(NetworkHostAndPort.parse("127.0.0.1:10005")).start("user1", "test").proxy
+            val friend = userListProxy.vaultQuery(StateContract.UserState::class.java).states.filter { it: StateAndRef<StateContract.UserState> ->
+                (it.state.data.login == friendLogin)
+            }.singleOrNull()
+            friend ?: throw FlowException("The friend is not registered")
+
+            // We retrieve the notary identity from the network map.
+            val notary = serviceHub.networkMapCache.notaryIdentities[0]
+
+            // Stage 1.
+            // Generate an unsigned transaction.
+            val identity = Party(
+                friend.state.data.participants[0].name,
+                KeyFactory.getInstance("EdDSA")
+                    .generatePublic(X509EncodedKeySpec(Base64.getDecoder().decode(friend.state.data.partyKey)))
+            )
+            val identityProxy = CordaRPCClient(NetworkHostAndPort.parse(friend.state.data.partyAddress)).start("user1", "test").proxy
+
+            val keyHash = Base64.getEncoder().encodeToString(MessageDigest.getInstance("SHA-256").digest(key.toByteArray()))
+            val inputUserBear = builder {
+                serviceHub.vaultService.queryBy(
+                    StateContract.BearState::class.java,
+                    criteria =
+                    VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)
+                    .and(VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::ownerLogin.equal(login)))
+                    .and(VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::color.equal(color)))
+                )
+            }.states[0]
+            val inputFriendBear = builder {
+                identityProxy.vaultQueryByCriteria<StateContract.BearState>(
+                    VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)
+                    .and(VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::ownerLogin.equal(friendLogin)))
+                    .and(VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::keyHash.equal(keyHash))),
+                    StateContract.BearState::class.java
+                )
+            }.states[0]
+            val outputUserBear = StateContract.BearState(inputFriendBear.state.data.color, login, "", ourIdentity)
+            val outputFriendBear = StateContract.BearState(inputUserBear.state.data.color, friendLogin, "", identity)
+
+            val txCommand = Command(BearContract.Present(), listOf(ourIdentity.owningKey, identity.owningKey))
+            val txBuilder = TransactionBuilder(notary)
+                    .addCommand(txCommand)
+            txBuilder.addInputState(inputUserBear)
+            txBuilder.addInputState(inputFriendBear)
+            txBuilder.addOutputState(outputUserBear, "com.template.contracts.BearContract")
+            txBuilder.addOutputState(outputFriendBear, "com.template.contracts.BearContract")
+            // Stage 2.
+            // Verify that the transaction is valid.
+            txBuilder.verify(serviceHub)
+
+            // Stage 3.
+            // Sign the transaction.
+            val signedTx = serviceHub.signInitialTransaction(txBuilder)
+
+            // Stage 4.
+            // Notarise and record the transaction in both parties' vaults.
+            return subFlow(FinalityFlow(signedTx))
+        }
+    }
+
+    @InitiatedBy(BearSwapFlow::class)
+    class BearSwapFlowResponder(val otherPartySession: FlowSession) : FlowLogic<SignedTransaction>() {
+        @Suspendable
+        override fun call() : SignedTransaction {
+            val signTransactionFlow = object : SignTransactionFlow(otherPartySession) {
+                override fun checkTransaction(stx: SignedTransaction) = requireThat {
+                    val ledgerTx = stx.toLedgerTransaction(serviceHub, false)
+                    "This consumes two items." using (ledgerTx.inputs.size == 2)
+                    "This issues two items." using (ledgerTx.outputs.size == 2)
+                    "This consumes bears." using (ledgerTx.inputs.all { it.state.data is StateContract.BearState })
+                    "This issues bears." using (ledgerTx.outputs.all { it.data is StateContract.BearState })
+                    val inputUserBear = ledgerTx.inputs[0].state.data as StateContract.BearState
+                    val inputFriendBear = ledgerTx.inputs[1].state.data as StateContract.BearState
+                    val outputUserBear = ledgerTx.outputs[0].data as StateContract.BearState
+                    val outputFriendBear = ledgerTx.outputs[1].data as StateContract.BearState
+                    "Login sets are equal." using (setOf(inputUserBear.ownerLogin, inputFriendBear.ownerLogin) == setOf(outputUserBear.ownerLogin, outputFriendBear.ownerLogin))
+                    "The keys are reset." using (outputUserBear.keyHash.isEmpty() && outputFriendBear.keyHash.isEmpty())
+                    "The characteristics match." using (
+                        (inputUserBear.color == outputFriendBear.color && inputFriendBear.color == outputUserBear.color) ||
+                        (inputUserBear.color == outputUserBear.color && inputFriendBear.color == outputFriendBear.color)
+                    )
                 }
             }
 
