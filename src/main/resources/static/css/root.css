@@ -58,7 +58,6 @@ body {
     background-color: #000;
     color: #FFF;
     transition: all 0.1s;
-    cursor: pointer;
 }
 .input:hover {
     border-bottom-color: #55A;

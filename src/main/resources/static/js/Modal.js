@@ -4,7 +4,7 @@ const Modal = {
 			<div class="content">
 				<div class="query">{{query}}</div>
 				<template v-if="mode === 'prompt'">
-					<input ref="input" class="input" @keypress.enter="promptFinish">
+					<input ref="input" class="input" @keypress.enter="promptFinish" v-model="promptText">
 					<button class="button" @click="promptFinish">&gt;</button>
 				</template>
 				<template v-else-if="mode === 'alert'">
@@ -18,19 +18,23 @@ const Modal = {
 			shown: false,
 			query: "",
 			mode: "",
-			promptCb: null
+			promptCb: null,
+			promptText: ""
 		};
 	},
 	methods: {
 		_show() {
 			this.shown = true;
+			document.addEventListener("keydown", this.onKeyDown);
 		},
 		_hide() {
 			this.shown = false;
+			document.removeEventListener("keydown", this.onKeyDown);
 		},
 
-		async prompt(query) {
+		prompt(query) {
 			this.query = query;
+			this.promptText = "";
 			this.mode = "prompt";
 			this._show();
 			setTimeout(() => {
@@ -42,7 +46,15 @@ const Modal = {
 		},
 		promptFinish() {
 			this._hide();
-			this.promptCb();
+			this.promptCb(this.promptText);
+		},
+		onKeyDown(e) {
+			if(e.key === "Escape") {
+				this._hide();
+				if(this.mode === "prompt") {
+					this.promptCb(null);
+				}
+			}
 		},
 
 		alert(query) {

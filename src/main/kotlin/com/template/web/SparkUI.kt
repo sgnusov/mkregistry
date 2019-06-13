@@ -151,7 +151,7 @@ object SparkUI {
             val user = userListProxy.vaultQuery(StateContract.UserState::class.java).states.filter { it: StateAndRef<StateContract.UserState> ->
                 it.state.data.login == login
             }.single().state.data
-            return@get "login=${user.login},partyAddress=${user.partyAddress}"
+            return@get "login=${user.login}&partyAddress=${user.partyAddress}"
         }
 
         http.post("/api/present") { req, res ->
@@ -165,7 +165,7 @@ object SparkUI {
             }[0]
             // Initiate BearPresentFlow
             partyProxy.startFlow(::BearPresentFlow, login, receiverLogin, color).returnValue.getOrThrow()
-            res.redirect("/")
+            return@post ""
         }
 
         http.post("/api/mix") { req, res ->
@@ -184,8 +184,7 @@ object SparkUI {
             val result = partyProxy.startFlow(::BearMixFlow, login, color1, color2).returnValue.getOrThrow()
             val newBear = result.tx.outputStates[0] as StateContract.BearState
 
-            val model = hashMapOf("color" to newBear.color)
-            freeMarkerEngine.render(ModelAndView(model, "SparkNewBear.ftl"))
+            return@post "color=${newBear.color}"
         }
 
         http.post("/api/swap/initialize") { req, res ->
@@ -207,8 +206,7 @@ object SparkUI {
             val keyHash = Base64.getEncoder().encodeToString(MessageDigest.getInstance("SHA-256").digest(key.toByteArray()))
             // Initiate BearKeyChangeFlow
             partyProxy.startFlow(::BearKeyChangeFlow, login, color, keyHash).returnValue.getOrThrow()
-            val model = hashMapOf("key" to key)
-            freeMarkerEngine.render(ModelAndView(model, "SparkSwap.ftl"))
+            return@post "key=${key}"
         }
 
         http.post("/api/swap/finalize") { req, res ->
@@ -223,10 +221,7 @@ object SparkUI {
             }[0]
             // Initiate BearSwapFlow
             partyProxy.startFlow(::BearSwapFlow, login, friendLogin, color, key).returnValue.getOrThrow()
-            res.redirect("/")
-        }
-
-        http.get("/api/whoami") { req, res ->
+            return@post ""
         }
     }
 

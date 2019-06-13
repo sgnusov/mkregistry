@@ -98,9 +98,13 @@ const Home = {
 
         async startPresent(bear) {
             const login = await this.$refs.modal.prompt("What's your friend login?");
+            if(!login) {
+                return;
+            }
             this.state = "presentInProgress";
             try {
                 await API.present(bear, login);
+                await this.loadBears();
                 this.$refs.modal.alert("Present sent!");
                 this.state = "home";
             } catch(e) {
