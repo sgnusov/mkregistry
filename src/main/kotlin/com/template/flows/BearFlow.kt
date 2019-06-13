@@ -121,13 +121,14 @@ object BearFlows
                 KeyFactory.getInstance("EdDSA")
                     .generatePublic(X509EncodedKeySpec(Base64.getDecoder().decode(receiver.state.data.partyKey)))
             )
+            
             val inputState = builder {
                 serviceHub.vaultService.queryBy(
-                    StateContract.BearState::class.java,
-                    criteria =
-                    VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)
-                    .and(VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::ownerLogin.equal(login)))
-                    .and(VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::color.equal(color)))
+                        StateContract.BearState::class.java,
+                        criteria =
+                        VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)
+                                .and(VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::ownerLogin.equal(login)))
+                                .and(VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::color.equal(color)))
                 )
             }.states[0]
             val outputState = StateContract.BearState(color, receiverLogin, identity)
@@ -144,11 +145,13 @@ object BearFlows
 
             // Stage 3.
             // Sign the transaction.
-            val signedTx = serviceHub.signInitialTransaction(txBuilder)
+            val partSignedTx = serviceHub.signInitialTransaction(txBuilder)
+            val receiverFlow = initiateFlow(identity)
+            val fullySignedTx = subFlow(CollectSignaturesFlow(partSignedTx, setOf(receiverFlow)))
 
             // Stage 4.
             // Notarise and record the transaction in both parties' vaults.
-            return subFlow(FinalityFlow(signedTx))
+            return subFlow(FinalityFlow(fullySignedTx))
         }
     }
 

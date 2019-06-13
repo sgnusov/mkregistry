@@ -8,5 +8,6 @@
 
     <body>
         <h1>You got new bear ${color}</h1>
+        <a href=/>Go to home</a>
     </body>
 </html>

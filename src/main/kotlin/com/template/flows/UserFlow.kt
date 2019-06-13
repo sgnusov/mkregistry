@@ -26,6 +26,7 @@ object UserFlows
     class UserCreateFlow(val login: String,
                          val password: String,
                          val partyAddress: String) : FlowLogic<SignedTransaction>() {
+
         /** The flow logic is encapsulated within the call() method. */
         @Suspendable
         override fun call(): SignedTransaction {
