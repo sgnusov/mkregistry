@@ -41,6 +41,7 @@ const Home = {
             </div>
 
             <div v-else>
+                <div :class="['bump', {big: state === 'home', small: state === 'mixing'}]"></div>
                 <BearList
                     :bears="bears"
                     :showInfo="state === 'home'"

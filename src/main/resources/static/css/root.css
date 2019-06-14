@@ -62,3 +62,14 @@ body {
 .input:hover {
     border-bottom-color: #55A;
 }
+
+.bump {
+    height: 0;
+    transition: all 0.2s;
+}
+.bump.big {
+    height: calc(50vh - 332px);
+}
+.bump.small {
+    height: calc(50vh - 504px);
+}
