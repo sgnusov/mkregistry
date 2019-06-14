@@ -3,6 +3,7 @@ package com.template.contracts
 import com.template.states.StateContract
 import net.corda.core.contracts.*
 import net.corda.core.transactions.LedgerTransaction
+import org.crsh.shell.impl.command.spi.Command
 
 // ************
 // * Contract *
@@ -15,6 +16,7 @@ class BearContract : Contract {
     class Issue : CommandData
     class Present : CommandData
     class Mix : CommandData
+    class Exchange : CommandData
     class SwapInitialize : CommandData
 
     override fun verify(tx: LedgerTransaction) {

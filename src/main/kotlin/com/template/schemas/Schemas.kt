@@ -30,14 +30,56 @@ object BearSchemaV1 : MappedSchema(
             @Column(name = "color")
             var color: Int,
 
-            @Column(name = "keyHash")
-            var keyHash: String,
-
             @Column(name = "owner")
-            var ownerLogin: String
+            var ownerLogin: String,
+
+            @Column(name = "active")
+            var active: Boolean
     ) : PersistentState() {
         // Default constructor required by hibernate.
-        constructor(): this("", 0, "", "")
+        constructor(): this("", 0, "", true)
+    }
+}
+
+/**
+ * The family of schemas for BearXchangeState.
+ */
+object BearExchangeSchema
+
+/**
+ * An BearsXchenge schema.
+ */
+object BearsExchangeSchemaV1 : MappedSchema(
+        schemaFamily = BearExchangeSchema.javaClass,
+        version = 1,
+        mappedTypes = listOf(PersistentBearsExchange::class.java)
+) {
+    @Entity
+    @Table(name = "iou_states")
+    class PersistentBearsExchange(
+            @Column(name = "initializerLogin")
+            var initializerLogin: String,
+
+            @Column(name = "initializer")
+            var initializer: String,
+
+            @Column(name = "initializerBearColor")
+            var initializerBearColor: Int,
+
+            @Column(name = "receiverLogin")
+            var receiverLogin: String,
+
+            @Column(name = "receiver")
+            var receiver: String,
+
+            @Column(name = "receiverBearColor")
+            var receiverBearColor: Int,
+
+            @Column(name = "accepted")
+            var accepted: Boolean
+    ) : PersistentState() {
+        // Default constructor required by hibernate.
+        constructor(): this("", "", 0, "", "", 0, false)
     }
 }
 

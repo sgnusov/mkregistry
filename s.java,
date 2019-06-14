@@ -1,0 +1,1101 @@
+[1mdiff --git a/src/main/kotlin/com/template/contracts/Contracts.kt b/src/main/kotlin/com/template/contracts/Contracts.kt[m
+[1mindex e8954ad..56c5a65 100644[m
+[1m--- a/src/main/kotlin/com/template/contracts/Contracts.kt[m
+[1m+++ b/src/main/kotlin/com/template/contracts/Contracts.kt[m
+[36m@@ -3,6 +3,7 @@[m [mpackage com.template.contracts[m
+ import com.template.states.StateContract[m
+ import net.corda.core.contracts.*[m
+ import net.corda.core.transactions.LedgerTransaction[m
+[32m+[m[32mimport org.crsh.shell.impl.command.spi.Command[m
+ [m
+ // ************[m
+ // * Contract *[m
+[36m@@ -15,6 +16,7 @@[m [mclass BearContract : Contract {[m
+     class Issue : CommandData[m
+     class Present : CommandData[m
+     class Mix : CommandData[m
+[32m+[m[32m    class Exchange : CommandData[m
+     class SwapInitialize : CommandData[m
+ [m
+     override fun verify(tx: LedgerTransaction) {[m
+[1mdiff --git a/src/main/kotlin/com/template/flows/BearFlow.kt b/src/main/kotlin/com/template/flows/BearFlow.kt[m
+[1mindex 9df6a94..14226aa 100644[m
+[1m--- a/src/main/kotlin/com/template/flows/BearFlow.kt[m
+[1m+++ b/src/main/kotlin/com/template/flows/BearFlow.kt[m
+[36m@@ -5,6 +5,7 @@[m [mimport com.template.contracts.BearContract[m
+ import com.template.states.StateContract[m
+ import com.template.schemas.BearSchemaV1[m
+ import com.template.schemas.UserSchemaV1[m
+[32m+[m[32mimport com.template.schemas.BearsExchangeSchemaV1[m
+ import net.corda.client.rpc.CordaRPCClient[m
+ import net.corda.core.contracts.*[m
+ import net.corda.core.utilities.NetworkHostAndPort[m
+[36m@@ -31,8 +32,7 @@[m [mimport java.security.KeyFactory[m
+ import java.security.MessageDigest[m
+ import java.util.Base64[m
+ [m
+[31m-object BearFlows[m
+[31m-{[m
+[32m+[m[32mobject BearFlows {[m
+     @InitiatingFlow[m
+     @StartableByRPC[m
+     @CordaSerializable[m
+[36m@@ -62,7 +62,7 @@[m [mobject BearFlows[m
+             val random = Random()[m
+             for (i in 1..100) {[m
+                 var color = Math.abs(random.nextInt() % 256)[m
+[31m-                val iouState = StateContract.BearState(color, login, "", ourIdentity)[m
+[32m+[m[32m                val iouState = StateContract.BearState(color, login, ourIdentity, true)[m
+                 txBuilder.addOutputState(iouState, "com.template.contracts.BearContract")[m
+             }[m
+ [m
+[36m@@ -83,7 +83,7 @@[m [mobject BearFlows[m
+     @InitiatedBy(BearIssueFlow::class)[m
+     class BearIssueFlowResponder(val otherPartySession: FlowSession) : FlowLogic<SignedTransaction>() {[m
+         @Suspendable[m
+[31m-        override fun call() : SignedTransaction {[m
+[32m+[m[32m        override fun call(): SignedTransaction {[m
+             val signTransactionFlow = object : SignTransactionFlow(otherPartySession) {[m
+                 override fun checkTransaction(stx: SignedTransaction) = requireThat {[m
+                     val output = stx.tx.outputs.single().data[m
+[36m@@ -118,9 +118,9 @@[m [mobject BearFlows[m
+             // Stage 1.[m
+             // Generate an unsigned transaction.[m
+             val identity = Party([m
+[31m-                receiver.state.data.participants[0].name,[m
+[31m-                KeyFactory.getInstance("EdDSA")[m
+[31m-                    .generatePublic(X509EncodedKeySpec(Base64.getDecoder().decode(receiver.state.data.partyKey)))[m
+[32m+[m[32m                    receiver.state.data.participants[0].name,[m
+[32m+[m[32m                    KeyFactory.getInstance("EdDSA")[m
+[32m+[m[32m                            .generatePublic(X509EncodedKeySpec(Base64.getDecoder().decode(receiver.state.data.partyKey)))[m
+             )[m
+             val inputState = builder {[m
+                 serviceHub.vaultService.queryBy([m
+[36m@@ -131,7 +131,7 @@[m [mobject BearFlows[m
+                                 .and(VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::color.equal(color)))[m
+                 )[m
+             }.states[0][m
+[31m-            val outputState = StateContract.BearState(color, receiverLogin, "", identity)[m
+[32m+[m[32m            val outputState = StateContract.BearState(color, receiverLogin, identity, true)[m
+             val txCommand = Command(BearContract.Present(), listOf(ourIdentity.owningKey, identity.owningKey))[m
+             val txBuilder = TransactionBuilder(notary)[m
+                     .addCommand(txCommand)[m
+[36m@@ -158,7 +158,7 @@[m [mobject BearFlows[m
+     @InitiatedBy(BearPresentFlow::class)[m
+     class BearPresentFlowResponder(val otherPartySession: FlowSession) : FlowLogic<SignedTransaction>() {[m
+         @Suspendable[m
+[31m-        override fun call() : SignedTransaction {[m
+[32m+[m[32m        override fun call(): SignedTransaction {[m
+             val signTransactionFlow = object : SignTransactionFlow(otherPartySession) {[m
+                 override fun checkTransaction(stx: SignedTransaction) = requireThat {[m
+                     val ledgerTx = stx.toLedgerTransaction(serviceHub, false)[m
+[36m@@ -167,9 +167,9 @@[m [mobject BearFlows[m
+                     "This consumes a bear." using (input is StateContract.BearState)[m
+                     "This issues a bear." using (output is StateContract.BearState)[m
+                     "The characteristics aren't changed." using ([m
+[31m-                        (input as StateContract.BearState).color ==[m
+[31m-                        (output as StateContract.BearState).color[m
+[31m-                    )[m
+[32m+[m[32m                            (input as StateContract.BearState).color ==[m
+[32m+[m[32m                                    (output as StateContract.BearState).color[m
+[32m+[m[32m                            )[m
+                 }[m
+             }[m
+ [m
+[36m@@ -178,7 +178,6 @@[m [mobject BearFlows[m
+     }[m
+ [m
+ [m
+[31m-[m
+     @InitiatingFlow[m
+     @StartableByRPC[m
+     @CordaSerializable[m
+[36m@@ -190,23 +189,23 @@[m [mobject BearFlows[m
+             val userListName = CordaX500Name("UserList", "New York", "US")[m
+             val userListParty = serviceHub.networkMapCache.getPeerByLegalName(userListName)!![m
+             val userListProxy = CordaRPCClient(NetworkHostAndPort.parse("127.0.0.1:10005")).start("user1", "test").proxy[m
+[31m-            val users = builder {[m
+[32m+[m[32m            val user = builder {[m
+                 userListProxy.vaultQueryByCriteria<StateContract.UserState>([m
+                         QueryCriteria.VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)[m
+[31m-                        .and(QueryCriteria.VaultCustomQueryCriteria(UserSchemaV1.PersistentUser::login.equal(login))),[m
+[32m+[m[32m                                .and(QueryCriteria.VaultCustomQueryCriteria(UserSchemaV1.PersistentUser::login.equal(login))),[m
+                         StateContract.UserState::class.java[m
+                 )[m
+             }.states.singleOrNull()[m
+[31m-            if (users == null) {[m
+[32m+[m[32m            if (user == null) {[m
+                 throw FlowException("No such user")[m
+             }[m
+ [m
+             val bears1 = builder {[m
+                 serviceHub.vaultService.queryBy([m
+[31m-                    StateContract.BearState::class.java,[m
+[31m-                    QueryCriteria.VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)[m
+[31m-                    .and(QueryCriteria.VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::ownerLogin.equal(login)))[m
+[31m-                    .and(QueryCriteria.VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::color.equal(color1)))[m
+[32m+[m[32m                        StateContract.BearState::class.java,[m
+[32m+[m[32m                        QueryCriteria.VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)[m
+[32m+[m[32m                                .and(QueryCriteria.VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::ownerLogin.equal(login)))[m
+[32m+[m[32m                                .and(QueryCriteria.VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::color.equal(color1)))[m
+                 )[m
+             }.states[m
+ [m
+[36m@@ -240,11 +239,11 @@[m [mobject BearFlows[m
+             // Generate an unsigned transaction.[m
+             val txCommand = Command(BearContract.Mix(), listOf(ourIdentity.owningKey))[m
+             val txBuilder = TransactionBuilder(notary)[m
+[31m-                .addInputState(bear1)[m
+[31m-                .addInputState(bear2)[m
+[31m-                .addCommand(txCommand)[m
+[32m+[m[32m                    .addInputState(bear1)[m
+[32m+[m[32m                    .addInputState(bear2)[m
+[32m+[m[32m                    .addCommand(txCommand)[m
+ [m
+[31m-            val bearState = StateContract.BearState((color1 + color2) / 2, login, "", ourIdentity)[m
+[32m+[m[32m            val bearState = StateContract.BearState((color1 + color2) / 2, login, ourIdentity, true)[m
+             txBuilder.addOutputState(bearState, "com.template.contracts.BearContract")[m
+ [m
+             // Stage 2.[m
+[36m@@ -264,12 +263,12 @@[m [mobject BearFlows[m
+     @InitiatedBy(BearMixFlow::class)[m
+     class BearMixFlowResponder(val otherPartySession: FlowSession) : FlowLogic<SignedTransaction>() {[m
+         @Suspendable[m
+[31m-        override fun call() : SignedTransaction {[m
+[32m+[m[32m        override fun call(): SignedTransaction {[m
+             val signTransactionFlow = object : SignTransactionFlow(otherPartySession) {[m
+                 override fun checkTransaction(stx: SignedTransaction) = requireThat {[m
+                     val ledgerTx = stx.toLedgerTransaction(serviceHub, false)[m
+                     "This issues a bear." using (ledgerTx.outputs.single().data is StateContract.BearState)[m
+[31m-                    val output = ledgerTx.outputs.single().data as  StateContract.BearState[m
+[32m+[m[32m                    val output = ledgerTx.outputs.single().data as StateContract.BearState[m
+                     "This consumes 2 inputs." using (ledgerTx.inputs.size == 2)[m
+                     "This consumes bears." using (ledgerTx.inputs.all { it.state.data is StateContract.BearState })[m
+                     val bear1 = ledgerTx.inputs[0].state.data as StateContract.BearState[m
+[36m@@ -283,50 +282,72 @@[m [mobject BearFlows[m
+     }[m
+ [m
+ [m
+[31m-[m
+     @InitiatingFlow[m
+     @StartableByRPC[m
+     @CordaSerializable[m
+[31m-    class BearKeyChangeFlow(val login: String,[m
+[31m-                            val color: Int,[m
+[31m-                            val newKeyHash: String) : FlowLogic<SignedTransaction>() {[m
+[32m+[m[32m    class BearsExchangeInitFlow(val initializerLogin: String,[m
+[32m+[m[32m                               val receiverLogin: String,[m
+[32m+[m[32m                               val color: Int) : FlowLogic<SignedTransaction>() {[m
+         /** The flow logic is encapsulated within the call() method. */[m
+         @Suspendable[m
+         override fun call(): SignedTransaction {[m
+[31m-            // Ask the userlist party to make sure there is a single user registered[m
+[32m+[m[32m            // Ask the userlist for users parties[m
+             val userListName = CordaX500Name("UserList", "New York", "US")[m
+             val userListParty = serviceHub.networkMapCache.getPeerByLegalName(userListName)!![m
+             val userListProxy = CordaRPCClient(NetworkHostAndPort.parse("127.0.0.1:10005")).start("user1", "test").proxy[m
+ [m
+[31m-            // Check that there are no bears with same key[m
+[31m-            val isUnique = builder {[m
+[31m-                serviceHub.vaultService.queryBy([m
+[31m-                    StateContract.BearState::class.java,[m
+[31m-                    criteria =[m
+[31m-                    VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)[m
+[31m-                    .and(VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::ownerLogin.equal(login)))[m
+[31m-                    .and(VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::keyHash.equal(newKeyHash)))[m
+[32m+[m[32m            val initializer = builder {[m
+[32m+[m[32m                userListProxy.vaultQueryByCriteria<StateContract.UserState>([m
+[32m+[m[32m                        QueryCriteria.VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)[m
+[32m+[m[32m                                .and(QueryCriteria.VaultCustomQueryCriteria(UserSchemaV1.PersistentUser::login.equal(initializerLogin))),[m
+[32m+[m[32m                        StateContract.UserState::class.java[m
+[32m+[m[32m                )[m
+[32m+[m[32m            }.states.singleOrNull()[m
+[32m+[m
+[32m+[m[32m            if (initializer == null) {[m
+[32m+[m[32m                throw FlowException("No such initializer")[m
+[32m+[m[32m            }[m
+[32m+[m
+[32m+[m[32m            val receiver = builder {[m
+[32m+[m[32m                userListProxy.vaultQueryByCriteria<StateContract.UserState>([m
+[32m+[m[32m                        QueryCriteria.VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)[m
+[32m+[m[32m                                .and(QueryCriteria.VaultCustomQueryCriteria(UserSchemaV1.PersistentUser::login.equal(receiverLogin))),[m
+[32m+[m[32m                        StateContract.UserState::class.java[m
+                 )[m
+[31m-            }.states.isEmpty()[m
+[31m-            if (!isUnique) {[m
+[31m-                throw FlowException("Key must be unique.")[m
+[32m+[m[32m            }.states.singleOrNull()[m
+[32m+[m
+[32m+[m[32m            if (receiver == null) {[m
+[32m+[m[32m                throw FlowException("No such receiver")[m
+             }[m
+ [m
+[32m+[m[32m            // Generating input states[m
+[32m+[m
+             val inputState = builder {[m
+                 serviceHub.vaultService.queryBy([m
+[31m-                    StateContract.BearState::class.java,[m
+[31m-                    criteria =[m
+[31m-                    VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)[m
+[31m-                    .and(VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::ownerLogin.equal(login)))[m
+[31m-                    .and(VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::color.equal(color)))[m
+[32m+[m[32m                        StateContract.BearState::class.java,[m
+[32m+[m[32m                        criteria =[m
+[32m+[m[32m                        VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)[m
+[32m+[m[32m                                .and(VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::ownerLogin.equal(initializerLogin)))[m
+[32m+[m[32m                                .and(VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::color.equal(color)))[m
+[32m+[m[32m                                .and(VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::active.equal(true)))[m
+                 )[m
+             }.states[0][m
+ [m
+[31m-            val outputState = StateContract.BearState([m
+[31m-                inputState.state.data.color,[m
+[31m-                inputState.state.data.ownerLogin,[m
+[31m-                newKeyHash,[m
+[31m-                inputState.state.data.issuer[m
+[32m+[m[32m            val outputBearState = StateContract.BearState([m
+[32m+[m[32m                    inputState.state.data.color,[m
+[32m+[m[32m                    initializerLogin,[m
+[32m+[m[32m                    initializer.state.data.registerer,[m
+[32m+[m[32m                    false[m
+[32m+[m[32m            )[m
+[32m+[m
+[32m+[m[32m            val outputBearsExchangeState = StateContract.BearsExchangeState([m
+[32m+[m[32m                    initializerLogin,[m
+[32m+[m[32m                    initializer.state.data.registerer,[m
+[32m+[m[32m                    inputState.state.data.color,[m
+[32m+[m[32m                    receiverLogin,[m
+[32m+[m[32m                    receiver.state.data.registerer,[m
+[32m+[m[32m                    0,[m
+[32m+[m[32m                    false[m
+             )[m
+ [m
+             // We retrieve the notary identity from the network map.[m
+[36m@@ -334,11 +355,12 @@[m [mobject BearFlows[m
+ [m
+             // Stage 1.[m
+             // Generate an unsigned transaction.[m
+[31m-            val txCommand = Command(BearContract.SwapInitialize(), listOf(ourIdentity.owningKey))[m
+[32m+[m[32m            val txCommand = Command(BearContract.Exchange(), listOf(ourIdentity.owningKey))[m
+             val txBuilder = TransactionBuilder(notary)[m
+                     .addCommand(txCommand)[m
+                     .addInputState(inputState)[m
+[31m-                    .addOutputState(outputState, "com.template.contracts.BearContract")[m
+[32m+[m[32m                    .addOutputState(outputBearState, "com.template.contracts.BearContract")[m
+[32m+[m[32m                    .addOutputState(outputBearsExchangeState, "com.template.contracts.BearContract")[m
+ [m
+             // Stage 2.[m
+             // Verify that the transaction is valid.[m
+[36m@@ -354,24 +376,40 @@[m [mobject BearFlows[m
+         }[m
+     }[m
+ [m
+[31m-    @InitiatedBy(BearKeyChangeFlow::class)[m
+[31m-    class BearKeyChangeFlowResponder(val otherPartySession: FlowSession) : FlowLogic<SignedTransaction>() {[m
+[32m+[m[32m    @InitiatedBy(BearsExchangeInitFlow::class)[m
+[32m+[m[32m    class BearsExchangeInitFlowResponder(val otherPartySession: FlowSession) : FlowLogic<SignedTransaction>() {[m
+         @Suspendable[m
+         override fun call() : SignedTransaction {[m
+             val signTransactionFlow = object : SignTransactionFlow(otherPartySession) {[m
+                 override fun checkTransaction(stx: SignedTransaction) = requireThat {[m
+[31m-                    val ledgerTx = stx.toLedgerTransaction(serviceHub)[m
+[32m+[m[32m                    val ledgerTx = stx.toLedgerTransaction(serviceHub, false)[m
+                     val input = ledgerTx.inputs.single().state.data[m
+[31m-                    val output = ledgerTx.outputs.single().data[m
+[32m+[m[32m                    val output = ledgerTx.outputs[m
+                     "This consumes a bear." using (input is StateContract.BearState)[m
+[31m-                    "This issues a bear." using (output is StateContract.BearState)[m
+[31m-                    "The owner isn't changed." using ([m
+[31m-                        (input as StateContract.BearState).ownerLogin ==[m
+[31m-                        (output as StateContract.BearState).ownerLogin[m
+[32m+[m[32m                    "This issues two items." using (output.size == 2)[m
+[32m+[m[32m                    "This issues a bear and an exchange state." using (setOf(output.map {it::class}) == setOf(StateContract.BearState::class, StateContract.BearsExchangeState::class))[m
+[32m+[m[32m                    val inputBear = input as StateContract.BearState[m
+[32m+[m[32m                    var bear: StateContract.BearState? = null[m
+[32m+[m[32m                    if (output[0].data::class == StateContract.BearState::class)[m
+[32m+[m[32m                        bear = output[0].data as StateContract.BearState[m
+[32m+[m[32m                    else[m[41m [m
+[32m+[m[32m                        bear = output[1].data as StateContract.BearState[m
+[32m+[m
+[32m+[m[32m                    var exchange: StateContract.BearsExchangeState? = null[m
+[32m+[m[32m                    if (output[0].data::class == StateContract.BearsExchangeState::class)[m
+[32m+[m[32m                        exchange = output[0].data as StateContract.BearsExchangeState[m
+[32m+[m[32m                    else[m[41m [m
+[32m+[m[32m                        exchange = output[1].data as StateContract.BearsExchangeState[m
+[32m+[m[32m                    "This issues correct bear." using ([m
+[32m+[m[32m                        bear.issuer == inputBear.issuer[m
+[32m+[m[32m                        && bear.color == inputBear.color[m
+[32m+[m[32m                        && bear.ownerLogin == inputBear.ownerLogin[m
+[32m+[m[32m                        && bear.active == false[m
+                     )[m
+[31m-                    "The characteristics aren't changed." using ([m
+[31m-                        (input as StateContract.BearState).color ==[m
+[31m-                        (output as StateContract.BearState).color[m
+[32m+[m[32m                    "This issues correct exchange state." using ([m
+[32m+[m[32m                        exchange.issuerLogin == inputBear.ownerLogin[m
+[32m+[m[32m                        && exchange.issuerParty == inputBear.issuer[m
+[32m+[m[32m                        && exchange.issuerBearColor == inputBear.color[m
+                     )[m
+                 }[m
+             }[m
+[36m@@ -385,59 +423,294 @@[m [mobject BearFlows[m
+     @InitiatingFlow[m
+     @StartableByRPC[m
+     @CordaSerializable[m
+[31m-    class BearSwapFlow(val login: String, val friendLogin: String, val color: Int, val key: String) : FlowLogic<SignedTransaction>() {[m
+[32m+[m[32m    class BearsExchangeSuggestFlow(val initializerLogin: String,[m
+[32m+[m[32m                                  val initializerBearColor: Int,[m
+[32m+[m[32m                                  val receiverLogin: String,[m
+[32m+[m[32m                                  val receiverBearColor: Int) : FlowLogic<SignedTransaction>() {[m
+         /** The flow logic is encapsulated within the call() method. */[m
+         @Suspendable[m
+         override fun call(): SignedTransaction {[m
+[31m-            // Get friend party[m
+[32m+[m[32m            // Ask the userlist for users parties[m
+             val userListName = CordaX500Name("UserList", "New York", "US")[m
+             val userListParty = serviceHub.networkMapCache.getPeerByLegalName(userListName)!![m
+             val userListProxy = CordaRPCClient(NetworkHostAndPort.parse("127.0.0.1:10005")).start("user1", "test").proxy[m
+[31m-            val friend = userListProxy.vaultQuery(StateContract.UserState::class.java).states.filter { it: StateAndRef<StateContract.UserState> ->[m
+[31m-                (it.state.data.login == friendLogin)[m
+[31m-            }.singleOrNull()[m
+[31m-            friend ?: throw FlowException("The friend is not registered")[m
+[32m+[m
+[32m+[m[32m            val initializer = builder {[m
+[32m+[m[32m                userListProxy.vaultQueryByCriteria<StateContract.UserState>([m
+[32m+[m[32m                        QueryCriteria.VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)[m
+[32m+[m[32m                        .and(QueryCriteria.VaultCustomQueryCriteria(UserSchemaV1.PersistentUser::login.equal(initializerLogin))),[m
+[32m+[m[32m                        StateContract.UserState::class.java[m
+[32m+[m[32m                )[m
+[32m+[m[32m            }.states.singleOrNull()[m
+[32m+[m
+[32m+[m[32m            if (initializer == null) {[m
+[32m+[m[32m                throw FlowException("No such initializer")[m
+[32m+[m[32m            }[m
+[32m+[m
+[32m+[m[32m            val receiver = builder {[m
+[32m+[m[32m                userListProxy.vaultQueryByCriteria<StateContract.UserState>([m
+[32m+[m[32m                        QueryCriteria.VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)[m
+[32m+[m[32m                        .and(QueryCriteria.VaultCustomQueryCriteria(UserSchemaV1.PersistentUser::login.equal(receiverLogin))),[m
+[32m+[m[32m                        StateContract.UserState::class.java[m
+[32m+[m[32m                )[m
+[32m+[m[32m            }.states.singleOrNull()[m
+[32m+[m
+[32m+[m[32m            if (receiver == null) {[m
+[32m+[m[32m                throw FlowException("No such receiver")[m
+[32m+[m[32m            }[m
+[32m+[m
+[32m+[m[32m            // Generating input states[m
+[32m+[m
+[32m+[m[32m            val inputBearState = builder {[m
+[32m+[m[32m                serviceHub.vaultService.queryBy([m
+[32m+[m[32m                    StateContract.BearState::class.java,[m
+[32m+[m[32m                    criteria =[m
+[32m+[m[32m                    VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)[m
+[32m+[m[32m                    .and(VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::ownerLogin.equal(receiverLogin)))[m
+[32m+[m[32m                    .and(VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::color.equal(receiverBearColor)))[m
+[32m+[m[32m                    .and(VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::active.equal(true)))[m
+[32m+[m[32m                )[m
+[32m+[m[32m            }.states[0][m
+[32m+[m[41m            [m
+[32m+[m[32m            val inputBearsExchangeState = builder {[m
+[32m+[m[32m                serviceHub.vaultService.queryBy([m
+[32m+[m[32m                    StateContract.BearsExchangeState::class.java,[m
+[32m+[m[32m                    criteria =[m
+[32m+[m[32m                    VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)[m
+[32m+[m[32m                    .and(VaultCustomQueryCriteria(BearsExchangeSchemaV1.PersistentBearsExchange::initializerLogin.equal(initializerLogin)))[m
+[32m+[m[32m                    //.and(VaultCustomQueryCriteria(BearsExchangeSchemaV1.PersistentBearsExchange::initializer.equal(initializer.state.data.registerer.name)))[m
+[32m+[m[32m                    .and(VaultCustomQueryCriteria(BearsExchangeSchemaV1.PersistentBearsExchange::initializerBearColor.equal(initializerBearColor)))[m
+[32m+[m[32m                    .and(VaultCustomQueryCriteria(BearsExchangeSchemaV1.PersistentBearsExchange::receiverLogin.equal(receiverLogin)))[m
+[32m+[m[32m                    //.and(VaultCustomQueryCriteria(BearsExchangeSchemaV1.PersistentBearsExchange::receiver.equal(receiver.state.data.registerer)))[m
+[32m+[m[32m                    .and(VaultCustomQueryCriteria(BearsExchangeSchemaV1.PersistentBearsExchange::receiverBearColor.equal(0)))[m
+[32m+[m[32m                    .and(VaultCustomQueryCriteria(BearsExchangeSchemaV1.PersistentBearsExchange::accepted.equal(false)))[m
+[32m+[m[32m                )[m
+[32m+[m[32m            }.states.single()[m
+[32m+[m
+[32m+[m[32m            val outputBearState = StateContract.BearState([m
+[32m+[m[32m                inputBearState.state.data.color,[m
+[32m+[m[32m                receiverLogin,[m
+[32m+[m[32m                receiver.state.data.registerer,[m
+[32m+[m[32m                false[m
+[32m+[m[32m            )[m
+[32m+[m
+[32m+[m[32m            val outputBearsExchangeState = StateContract.BearsExchangeState([m
+[32m+[m[32m                    initializerLogin,[m
+[32m+[m[32m                    initializer.state.data.registerer,[m
+[32m+[m[32m                    initializerBearColor,[m
+[32m+[m[32m                    receiverLogin,[m
+[32m+[m[32m                    receiver.state.data.registerer,[m
+[32m+[m[32m                    receiverBearColor,[m
+[32m+[m[32m                    true[m
+[32m+[m[32m            )[m
+ [m
+             // We retrieve the notary identity from the network map.[m
+             val notary = serviceHub.networkMapCache.notaryIdentities[0][m
+ [m
+             // Stage 1.[m
+             // Generate an unsigned transaction.[m
+[31m-            val identity = Party([m
+[31m-                friend.state.data.participants[0].name,[m
+[31m-                KeyFactory.getInstance("EdDSA")[m
+[31m-                    .generatePublic(X509EncodedKeySpec(Base64.getDecoder().decode(friend.state.data.partyKey)))[m
+[31m-            )[m
+[31m-            val identityProxy = CordaRPCClient(NetworkHostAndPort.parse(friend.state.data.partyAddress)).start("user1", "test").proxy[m
+[32m+[m[32m            val txCommand = Command(BearContract.Exchange(), listOf(ourIdentity.owningKey))[m
+[32m+[m[32m            val txBuilder = TransactionBuilder(notary)[m
+[32m+[m[32m                    .addCommand(txCommand)[m
+[32m+[m[32m                    .addInputState(inputBearState)[m
+[32m+[m[32m                    .addInputState(inputBearsExchangeState)[m
+[32m+[m[32m                    .addOutputState(outputBearState, "com.template.contracts.BearContract")[m
+[32m+[m[32m                    .addOutputState(outputBearsExchangeState, "com.template.contracts.BearContract")[m
+[32m+[m
+[32m+[m[32m            // Stage 2.[m
+[32m+[m[32m            // Verify that the transaction is valid.[m
+[32m+[m[32m            txBuilder.verify(serviceHub)[m
+[32m+[m
+[32m+[m[32m            // Stage 3.[m
+[32m+[m[32m            // Sign the transaction.[m
+[32m+[m[32m            val signedTx = serviceHub.signInitialTransaction(txBuilder)[m
+[32m+[m
+[32m+[m[32m            // Stage 4.[m
+[32m+[m[32m            // Notarise and record the transaction in both parties' vaults.[m
+[32m+[m[32m                return subFlow(FinalityFlow(signedTx))[m
+[32m+[m[32m        }[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    @InitiatedBy(BearsExchangeSuggestFlow::class)[m
+[32m+[m[32m    class BearsExchangeSuggestFlowResponder(val otherPartySession: FlowSession) : FlowLogic<SignedTransaction>() {[m
+[32m+[m[32m        @Suspendable[m
+[32m+[m[32m        override fun call() : SignedTransaction {[m
+[32m+[m[32m            val signTransactionFlow = object : SignTransactionFlow(otherPartySession) {[m
+[32m+[m[32m                override fun checkTransaction(stx: SignedTransaction) = requireThat {[m
+[32m+[m[32m                    val ledgerTx = stx.toLedgerTransaction(serviceHub, false)[m[41m [m
+[32m+[m[32m                    val input = ledgerTx.inputs[m
+[32m+[m[32m                    val output = ledgerTx.outputs[m
+[32m+[m[32m                    "This consumes two items." using (output.size == 2)[m
+[32m+[m[32m                    "This consumes a bear and an exchange state." using ([m
+[32m+[m[32m                        setOf(output.map {it::class})[m[41m [m
+[32m+[m[32m                        == setOf(StateContract.BearState::class, StateContract.BearsExchangeState::class)[m
+[32m+[m[32m                    )[m
+[32m+[m[32m                    "This issues two items." using (output.size == 2)[m
+[32m+[m[32m                    "This issues a bear and an exchange state." using ([m
+[32m+[m[32m                        setOf(output.map {it::class})[m[41m [m
+[32m+[m[32m                        == setOf(StateContract.BearState::class, StateContract.BearsExchangeState::class)[m
+[32m+[m[32m                    )[m
+[32m+[m[41m                    [m
+[32m+[m[32m                    var inputBear: StateContract.BearState? = null[m
+[32m+[m[32m                    if (input[0].state.data::class == StateContract.BearState::class)[m
+[32m+[m[32m                        inputBear = input[0].state.data as StateContract.BearState[m
+[32m+[m[32m                    else[m[41m [m
+[32m+[m[32m                        inputBear = input[1].state.data as StateContract.BearState[m
+[32m+[m
+[32m+[m[32m                    var inputExchange: StateContract.BearsExchangeState? = null[m
+[32m+[m[32m                    if (input[0].state.data::class == StateContract.BearsExchangeState::class)[m
+[32m+[m[32m                        inputExchange = input[0].state.data as StateContract.BearsExchangeState[m
+[32m+[m[32m                    else[m[41m [m
+[32m+[m[32m                        inputExchange = input[1].state.data as StateContract.BearsExchangeState[m
+[32m+[m
+[32m+[m[32m                    var outputBear: StateContract.BearState? = null[m
+[32m+[m[32m                    if (output[0].data::class == StateContract.BearState::class)[m
+[32m+[m[32m                        outputBear = output[0].data as StateContract.BearState[m
+[32m+[m[32m                    else[m[41m [m
+[32m+[m[32m                        outputBear = output[1].data as StateContract.BearState[m
+[32m+[m
+[32m+[m[32m                    var outputExchange: StateContract.BearsExchangeState? = null[m
+[32m+[m[32m                    if (output[0].data::class == StateContract.BearsExchangeState::class)[m
+[32m+[m[32m                        outputExchange = output[0].data as StateContract.BearsExchangeState[m
+[32m+[m[32m                    else[m[41m [m
+[32m+[m[32m                        outputExchange = output[1].data as StateContract.BearsExchangeState[m
+[32m+[m[41m                    [m
+[32m+[m[32m                    "This issues correct bear." using ([m
+[32m+[m[32m                        outputBear.issuer == inputBear.issuer[m
+[32m+[m[32m                        && outputBear.color == inputBear.color[m
+[32m+[m[32m                        && outputBear.ownerLogin == inputBear.ownerLogin[m
+[32m+[m[32m                        && outputBear.active == false[m
+[32m+[m[32m                    )[m
+[32m+[m[32m                    "This issues correct exchange state." using ([m
+[32m+[m[32m                        outputExchange.issuerLogin == inputExchange.issuerLogin[m
+[32m+[m[32m                        && outputExchange.issuerParty == inputExchange.issuerParty[m
+[32m+[m[32m                        && outputExchange.issuerBearColor == inputExchange.issuerBearColor[m
+[32m+[m[32m                        && outputExchange.receiverLogin == inputExchange.receiverLogin[m
+[32m+[m[32m                        && outputExchange.receiverParty == inputExchange.receiverParty[m
+[32m+[m[32m                        && outputExchange.receiverBearColor == inputExchange.receiverBearColor[m
+[32m+[m[32m                        && outputExchange.receiverLogin == inputBear.ownerLogin[m
+[32m+[m[32m                        && outputExchange.receiverParty == inputBear.issuer[m
+[32m+[m[32m                        && outputExchange.receiverBearColor == inputBear.color[m
+[32m+[m
+[32m+[m[32m                    )[m
+[32m+[m[32m                }[m
+[32m+[m[32m            }[m
+[32m+[m
+[32m+[m[32m            return subFlow(signTransactionFlow)[m
+[32m+[m[32m        }[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m
+[32m+[m[32m    @InitiatingFlow[m
+[32m+[m[32m    @StartableByRPC[m
+[32m+[m[32m    @CordaSerializable[m
+[32m+[m[32m    class BearsExchangeAcceptFlow(val initializerLogin: String,[m
+[32m+[m[32m                                  val initializerBearColor: Int,[m
+[32m+[m[32m                                  val receiverLogin: String,[m
+[32m+[m[32m                                  val receiverBearColor: Int) : FlowLogic<SignedTransaction>() {[m
+[32m+[m[32m        /** The flow logic is encapsulated within the call() method. */[m
+[32m+[m[32m        @Suspendable[m
+[32m+[m[32m        override fun call(): SignedTransaction {[m
+[32m+[m[32m            // Ask the userlist for users parties[m
+[32m+[m[32m            val userListName = CordaX500Name("UserList", "New York", "US")[m
+[32m+[m[32m            val userListParty = serviceHub.networkMapCache.getPeerByLegalName(userListName)!![m
+[32m+[m[32m            val userListProxy = CordaRPCClient(NetworkHostAndPort.parse("127.0.0.1:10005")).start("user1", "test").proxy[m
+ [m
+[31m-            val keyHash = Base64.getEncoder().encodeToString(MessageDigest.getInstance("SHA-256").digest(key.toByteArray()))[m
+[31m-            val inputUserBear = builder {[m
+[32m+[m[32m            val initializer = builder {[m
+[32m+[m[32m                userListProxy.vaultQueryByCriteria<StateContract.UserState>([m
+[32m+[m[32m                        QueryCriteria.VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)[m
+[32m+[m[32m                        .and(QueryCriteria.VaultCustomQueryCriteria(UserSchemaV1.PersistentUser::login.equal(initializerLogin))),[m
+[32m+[m[32m                        StateContract.UserState::class.java[m
+[32m+[m[32m                )[m
+[32m+[m[32m            }.states.singleOrNull()[m
+[32m+[m
+[32m+[m[32m            if (initializer == null) {[m
+[32m+[m[32m                throw FlowException("No such initializer")[m
+[32m+[m[32m            }[m
+[32m+[m
+[32m+[m[32m            val receiver = builder {[m
+[32m+[m[32m                userListProxy.vaultQueryByCriteria<StateContract.UserState>([m
+[32m+[m[32m                        QueryCriteria.VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)[m
+[32m+[m[32m                        .and(QueryCriteria.VaultCustomQueryCriteria(UserSchemaV1.PersistentUser::login.equal(receiverLogin))),[m
+[32m+[m[32m                        StateContract.UserState::class.java[m
+[32m+[m[32m                )[m
+[32m+[m[32m            }.states.singleOrNull()[m
+[32m+[m
+[32m+[m[32m            if (receiver == null) {[m
+[32m+[m[32m                throw FlowException("No such receiver")[m
+[32m+[m[32m            }[m
+[32m+[m
+[32m+[m[32m            // Generating input states[m
+[32m+[m
+[32m+[m[32m            val inputBearState1 = builder {[m
+                 serviceHub.vaultService.queryBy([m
+                     StateContract.BearState::class.java,[m
+                     criteria =[m
+                     VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)[m
+[31m-                    .and(VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::ownerLogin.equal(login)))[m
+[31m-                    .and(VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::color.equal(color)))[m
+[32m+[m[32m                    .and(VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::ownerLogin.equal(initializerLogin)))[m
+[32m+[m[32m                    .and(VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::color.equal(initializerBearColor)))[m
+[32m+[m[32m                    .and(VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::active.equal(false)))[m
+                 )[m
+             }.states[0][m
+[31m-            val inputFriendBear = builder {[m
+[32m+[m
+[32m+[m[32m            val identity = Party(receiver.state.data.participants[0].name,[m
+[32m+[m[32m                                 KeyFactory.getInstance("EdDSA")[m
+[32m+[m[32m                                    .generatePublic(X509EncodedKeySpec(Base64.getDecoder().decode(receiver.state.data.partyKey))))[m
+[32m+[m[32m            val identityProxy = CordaRPCClient(NetworkHostAndPort.parse(receiver.state.data.partyAddress)).start("user1", "test").proxy[m
+[32m+[m
+[32m+[m[32m            val inputBearState2 = builder {[m
+                 identityProxy.vaultQueryByCriteria<StateContract.BearState>([m
+                     VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)[m
+[31m-                    .and(VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::ownerLogin.equal(friendLogin)))[m
+[31m-                    .and(VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::keyHash.equal(keyHash))),[m
+[32m+[m[32m                    .and(VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::ownerLogin.equal(receiverLogin)))[m
+[32m+[m[32m                    .and(VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::color.equal(receiverBearColor)))[m
+[32m+[m[32m                    .and(VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::active.equal(false))),[m
+                     StateContract.BearState::class.java[m
+                 )[m
+             }.states[0][m
+[31m-            val outputUserBear = StateContract.BearState(inputFriendBear.state.data.color, login, "", ourIdentity)[m
+[31m-            val outputFriendBear = StateContract.BearState(inputUserBear.state.data.color, friendLogin, "", identity)[m
+[32m+[m[41m            [m
+[32m+[m[32m            val inputBearsExchangeState = builder {[m
+[32m+[m[32m                serviceHub.vaultService.queryBy([m
+[32m+[m[32m                    StateContract.BearsExchangeState::class.java,[m
+[32m+[m[32m                    criteria =[m
+[32m+[m[32m                    VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)[m
+[32m+[m[32m                    .and(VaultCustomQueryCriteria(BearsExchangeSchemaV1.PersistentBearsExchange::initializerLogin.equal(initializerLogin)))[m
+[32m+[m[32m                    //.and(VaultCustomQueryCriteria(BearsExchangeSchemaV1.PersistentBearsExchange::initializer.equal(initializerParty)))[m
+[32m+[m[32m                    .and(VaultCustomQueryCriteria(BearsExchangeSchemaV1.PersistentBearsExchange::initializerBearColor.equal(initializerBearColor)))[m
+[32m+[m[32m                    .and(VaultCustomQueryCriteria(BearsExchangeSchemaV1.PersistentBearsExchange::receiverLogin.equal(receiverLogin)))[m
+[32m+[m[32m                    //.and(VaultCustomQueryCriteria(BearsExchangeSchemaV1.PersistentBearsExchange::receiver.equal(receiverParty)))[m
+[32m+[m[32m                    .and(VaultCustomQueryCriteria(BearsExchangeSchemaV1.PersistentBearsExchange::receiverBearColor.equal(receiverBearColor)))[m
+[32m+[m[32m                    .and(VaultCustomQueryCriteria(BearsExchangeSchemaV1.PersistentBearsExchange::accepted.equal(true)))[m
+[32m+[m[32m                )[m
+[32m+[m[32m            }.states.single()[m
+ [m
+[31m-            val txCommand = Command(BearContract.Present(), listOf(ourIdentity.owningKey, identity.owningKey))[m
+[32m+[m[32m            val outputBearState1 = StateContract.BearState([m
+[32m+[m[32m                inputBearState2.state.data.color,[m
+[32m+[m[32m                initializerLogin,[m
+[32m+[m[32m                initializer.state.data.registerer,[m
+[32m+[m[32m                true[m
+[32m+[m[32m            )[m
+[32m+[m
+[32m+[m[32m            val outputBearState2 = StateContract.BearState([m
+[32m+[m[32m                inputBearState1.state.data.color,[m
+[32m+[m[32m                receiverLogin,[m
+[32m+[m[32m                receiver.state.data.registerer,[m
+[32m+[m[32m                true[m
+[32m+[m[32m            )[m
+[32m+[m
+[32m+[m[32m            // We retrieve the notary identity from the network map.[m
+[32m+[m[32m            val notary = serviceHub.networkMapCache.notaryIdentities[0][m
+[32m+[m
+[32m+[m[32m            // Stage 1.[m
+[32m+[m[32m            // Generate an unsigned transaction.[m
+[32m+[m[32m            val txCommand = Command(BearContract.Exchange(), listOf(ourIdentity.owningKey))[m
+             val txBuilder = TransactionBuilder(notary)[m
+                     .addCommand(txCommand)[m
+[31m-            txBuilder.addInputState(inputUserBear)[m
+[31m-            txBuilder.addInputState(inputFriendBear)[m
+[31m-            txBuilder.addOutputState(outputUserBear, "com.template.contracts.BearContract")[m
+[31m-            txBuilder.addOutputState(outputFriendBear, "com.template.contracts.BearContract")[m
+[32m+[m[32m                    .addInputState(inputBearState1)[m
+[32m+[m[32m                    .addInputState(inputBearState2)[m
+[32m+[m[32m                    .addInputState(inputBearsExchangeState)[m
+[32m+[m[32m                    .addOutputState(outputBearState1, "com.template.contracts.BearContract")[m
+[32m+[m[32m                    .addOutputState(outputBearState2, "com.template.contracts.BearContract")[m
+[32m+[m
+             // Stage 2.[m
+             // Verify that the transaction is valid.[m
+             txBuilder.verify(serviceHub)[m
+[36m@@ -452,26 +725,96 @@[m [mobject BearFlows[m
+         }[m
+     }[m
+ [m
+[31m-    @InitiatedBy(BearSwapFlow::class)[m
+[31m-    class BearSwapFlowResponder(val otherPartySession: FlowSession) : FlowLogic<SignedTransaction>() {[m
+[32m+[m[32m    @InitiatedBy(BearsExchangeAcceptFlow::class)[m
+[32m+[m[32m    class BearExchangeAccapetFlowResponder(val otherPartySession: FlowSession) : FlowLogic<SignedTransaction>() {[m
+         @Suspendable[m
+         override fun call() : SignedTransaction {[m
+             val signTransactionFlow = object : SignTransactionFlow(otherPartySession) {[m
+                 override fun checkTransaction(stx: SignedTransaction) = requireThat {[m
+                     val ledgerTx = stx.toLedgerTransaction(serviceHub, false)[m
+[31m-                    "This consumes two items." using (ledgerTx.inputs.size == 2)[m
+[31m-                    "This issues two items." using (ledgerTx.outputs.size == 2)[m
+[31m-                    "This consumes bears." using (ledgerTx.inputs.all { it.state.data is StateContract.BearState })[m
+[31m-                    "This issues bears." using (ledgerTx.outputs.all { it.data is StateContract.BearState })[m
+[31m-                    val inputUserBear = ledgerTx.inputs[0].state.data as StateContract.BearState[m
+[31m-                    val inputFriendBear = ledgerTx.inputs[1].state.data as StateContract.BearState[m
+[31m-                    val outputUserBear = ledgerTx.outputs[0].data as StateContract.BearState[m
+[31m-                    val outputFriendBear = ledgerTx.outputs[1].data as StateContract.BearState[m
+[31m-                    "Login sets are equal." using (setOf(inputUserBear.ownerLogin, inputFriendBear.ownerLogin) == setOf(outputUserBear.ownerLogin, outputFriendBear.ownerLogin))[m
+[31m-                    "The keys are reset." using (outputUserBear.keyHash.isEmpty() && outputFriendBear.keyHash.isEmpty())[m
+[31m-                    "The characteristics match." using ([m
+[31m-                        (inputUserBear.color == outputFriendBear.color && inputFriendBear.color == outputUserBear.color) ||[m
+[31m-                        (inputUserBear.color == outputUserBear.color && inputFriendBear.color == outputFriendBear.color)[m
+[32m+[m[32m                    val input = ledgerTx.inputs[m
+[32m+[m[32m                    val output = ledgerTx.outputs[m
+[32m+[m[32m                    "This consumes two items." using (input.size == 3)[m
+[32m+[m[32m                    "This consumes a bear and an exchange state." using ([m
+[32m+[m[32m                        setOf(input.map {it::class})[m
+[32m+[m[32m                        == setOf(StateContract.BearState::class,[m[41m [m
+[32m+[m[32m                            StateContract.BearState::class,[m[41m [m
+[32m+[m[32m                            StateContract.BearsExchangeState::class)[m
+[32m+[m[32m                    )[m
+[32m+[m[32m                    "This issues two items." using (output.size == 2)[m
+[32m+[m[32m                    "This issues bears" using (setOf(output.map {it::class}) == setOf(StateContract.BearState::class,[m
+[32m+[m[32m                        StateContract.BearState::class))[m
+[32m+[m[41m                    [m
+[32m+[m[32m                    var inputBear1: StateContract.BearState? = null[m
+[32m+[m[32m                    if (input[0].state.data::class == StateContract.BearState::class)[m
+[32m+[m[32m                        inputBear1 = input[0].state.data as StateContract.BearState[m
+[32m+[m[32m                    else if (input[1].state.data::class == StateContract.BearState::class)[m
+[32m+[m[32m                        inputBear1 = input[1].state.data as StateContract.BearState[m
+[32m+[m[32m                    else[m
+[32m+[m[32m                        inputBear1 = input[2].state.data as StateContract.BearState[m
+[32m+[m
+[32m+[m[32m                    var inputBear2: StateContract.BearState? = null[m
+[32m+[m[32m                    if (input[0].state.data::class == StateContract.BearState::class && input[0].state.data != inputBear1)[m
+[32m+[m[32m                        inputBear2 = input[0].state.data as StateContract.BearState[m
+[32m+[m[32m                    else if (input[1].state.data::class == StateContract.BearState::class && input[1].state.data != inputBear1)[m
+[32m+[m[32m                        inputBear2 = input[1].state.data as StateContract.BearState[m
+[32m+[m[32m                    else[m
+[32m+[m[32m                        inputBear2 = input[2].state.data as StateContract.BearState[m
+[32m+[m
+[32m+[m[32m                    var inputExchange: StateContract.BearsExchangeState? = null[m
+[32m+[m[32m                    if (input[0].state.data::class == StateContract.BearsExchangeState::class)[m
+[32m+[m[32m                        inputExchange = input[0].state.data as StateContract.BearsExchangeState[m
+[32m+[m[32m                    else if (input[1].state.data::class == StateContract.BearsExchangeState::class)[m
+[32m+[m[32m                        inputExchange = input[1].state.data as StateContract.BearsExchangeState[m
+[32m+[m[32m                    else[m
+[32m+[m[32m                        inputExchange = input[2].state.data as StateContract.BearsExchangeState[m
+[32m+[m
+[32m+[m[32m                    var outputBear1: StateContract.BearState? = null[m
+[32m+[m[32m                    if (output[0].data::class == StateContract.BearState::class)[m
+[32m+[m[32m                        outputBear1 = output[0].data as StateContract.BearState[m
+[32m+[m[32m                    else if (output[1].data::class == StateContract.BearState::class)[m
+[32m+[m[32m                        outputBear1 = output[1].data as StateContract.BearState[m
+[32m+[m[32m                    else[m
+[32m+[m[32m                        outputBear1 = output[2].data as StateContract.BearState[m
+[32m+[m
+[32m+[m[32m                    var outputBear2: StateContract.BearState? = null[m
+[32m+[m[32m                    if (output[0].data::class == StateContract.BearState::class && output[0].data != outputBear1)[m
+[32m+[m[32m                        outputBear2 = output[0].data as StateContract.BearState[m
+[32m+[m[32m                    else if (output[1].data::class == StateContract.BearState::class && output[1].data != outputBear1)[m
+[32m+[m[32m                        outputBear2 = output[1].data as StateContract.BearState[m
+[32m+[m[32m                    else[m
+[32m+[m[32m                        outputBear2 = output[2].data as StateContract.BearState[m
+[32m+[m
+[32m+[m[32m                    if (outputBear1.issuer == inputBear1.issuer) {[m
+[32m+[m[32m                        var temp = outputBear1[m
+[32m+[m[32m                        outputBear1 = outputBear2[m
+[32m+[m[32m                        outputBear2 = temp[m
+[32m+[m[32m                    }[m
+[32m+[m
+[32m+[m[32m                    "This issues correct bears." using ([m
+[32m+[m[32m                        outputBear1.issuer == inputBear2.issuer[m
+[32m+[m[32m                        && outputBear1.color == inputBear1.color[m
+[32m+[m[32m                        && outputBear1.ownerLogin == inputBear2.ownerLogin[m
+[32m+[m[32m                        && outputBear1.active == true[m
+[32m+[m[32m                        && outputBear2.issuer == inputBear1.issuer[m
+[32m+[m[32m                        && outputBear2.color == inputBear2.color[m
+[32m+[m[32m                        && outputBear2.ownerLogin == inputBear1.ownerLogin[m
+[32m+[m[32m                        && outputBear2.active == true[m
+[32m+[m[32m                    )[m
+[32m+[m
+[32m+[m[32m                    if (outputBear1.issuer == inputExchange.receiverParty) {[m
+[32m+[m[32m                        var temp = outputBear1;[m
+[32m+[m
+[32m+[m[32m                    }[m
+[32m+[m
+[32m+[m[32m                    "This consumes correct exchange state." using ([m
+[32m+[m[32m                        inputExchange.issuerLogin == inputBear1.ownerLogin[m
+[32m+[m[32m                        && inputExchange.issuerParty == inputBear1.issuer[m
+[32m+[m[32m                        && inputExchange.issuerBearColor == inputBear1.color[m
+[32m+[m[32m                        && inputExchange.receiverLogin == inputBear2.ownerLogin[m
+[32m+[m[32m                        && inputExchange.receiverParty == inputBear2.issuer[m
+[32m+[m[32m                        && inputExchange.receiverBearColor == inputBear2.color[m
+[32m+[m[32m                        && inputExchange.accepted == true[m
+                     )[m
+                 }[m
+             }[m
+[1mdiff --git a/src/main/kotlin/com/template/schemas/Schemas.kt b/src/main/kotlin/com/template/schemas/Schemas.kt[m
+[1mindex c891c4d..587aedc 100644[m
+[1m--- a/src/main/kotlin/com/template/schemas/Schemas.kt[m
+[1m+++ b/src/main/kotlin/com/template/schemas/Schemas.kt[m
+[36m@@ -30,14 +30,56 @@[m [mobject BearSchemaV1 : MappedSchema([m
+             @Column(name = "color")[m
+             var color: Int,[m
+ [m
+[31m-            @Column(name = "keyHash")[m
+[31m-            var keyHash: String,[m
+[31m-[m
+             @Column(name = "owner")[m
+[31m-            var ownerLogin: String[m
+[32m+[m[32m            var ownerLogin: String,[m
+[32m+[m
+[32m+[m[32m            @Column(name = "active")[m
+[32m+[m[32m            var active: Boolean[m
+[32m+[m[32m    ) : PersistentState() {[m
+[32m+[m[32m        // Default constructor required by hibernate.[m
+[32m+[m[32m        constructor(): this("", 0, "", true)[m
+[32m+[m[32m    }[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32m/**[m
+[32m+[m[32m * The family of schemas for BearXchangeState.[m
+[32m+[m[32m */[m
+[32m+[m[32mobject BearExchangeSchema[m
+[32m+[m
+[32m+[m[32m/**[m
+[32m+[m[32m * An BearsXchenge schema.[m
+[32m+[m[32m */[m
+[32m+[m[32mobject BearsExchangeSchemaV1 : MappedSchema([m
+[32m+[m[32m        schemaFamily = BearExchangeSchema.javaClass,[m
+[32m+[m[32m        version = 1,[m
+[32m+[m[32m        mappedTypes = listOf(PersistentBearsExchange::class.java)[m
+[32m+[m[32m) {[m
+[32m+[m[32m    @Entity[m
+[32m+[m[32m    @Table(name = "iou_states")[m
+[32m+[m[32m    class PersistentBearsExchange([m
+[32m+[m[32m            @Column(name = "initializerLogin")[m
+[32m+[m[32m            var initializerLogin: String,[m
+[32m+[m
+[32m+[m[32m            @Column(name = "initializer")[m
+[32m+[m[32m            var initializer: String,[m
+[32m+[m
+[32m+[m[32m            @Column(name = "initializerBearColor")[m
+[32m+[m[32m            var initializerBearColor: Int,[m
+[32m+[m
+[32m+[m[32m            @Column(name = "receiverLogin")[m
+[32m+[m[32m            var receiverLogin: String,[m
+[32m+[m
+[32m+[m[32m            @Column(name = "receiver")[m
+[32m+[m[32m            var receiver: String,[m
+[32m+[m
+[32m+[m[32m            @Column(name = "receiverBearColor")[m
+[32m+[m[32m            var receiverBearColor: Int,[m
+[32m+[m
+[32m+[m[32m            @Column(name = "accepted")[m
+[32m+[m[32m            var accepted: Boolean[m
+     ) : PersistentState() {[m
+         // Default constructor required by hibernate.[m
+[31m-        constructor(): this("", 0, "", "")[m
+[32m+[m[32m        constructor(): this("", "", 0, "", "", 0, false)[m
+     }[m
+ }[m
+ [m
+[1mdiff --git a/src/main/kotlin/com/template/states/States.kt b/src/main/kotlin/com/template/states/States.kt[m
+[1mindex babbf2f..0ab9233 100644[m
+[1m--- a/src/main/kotlin/com/template/states/States.kt[m
+[1m+++ b/src/main/kotlin/com/template/states/States.kt[m
+[36m@@ -2,6 +2,7 @@[m [mpackage com.template.states[m
+ [m
+ import com.template.schemas.UserSchemaV1[m
+ import com.template.schemas.BearSchemaV1[m
+[32m+[m[32mimport com.template.schemas.BearsExchangeSchemaV1[m
+ import net.corda.core.contracts.ContractState[m
+ import net.corda.core.contracts.LinearState[m
+ import net.corda.core.contracts.UniqueIdentifier[m
+[36m@@ -25,8 +26,8 @@[m [mimport javax.management.Query[m
+ object StateContract {[m
+     class BearState(val color: Int,[m
+                     val ownerLogin: String,[m
+[31m-                    val keyHash: String,[m
+[31m-                    val issuer: Party) : ContractState, QueryableState {[m
+[32m+[m[32m                    val issuer: Party,[m
+[32m+[m[32m                    val active: Boolean) : ContractState, QueryableState {[m
+         override val participants get() = listOf(issuer)[m
+ [m
+         override fun generateMappedObject(schema: MappedSchema): PersistentState {[m
+[36m@@ -34,8 +35,8 @@[m [mobject StateContract {[m
+                 is BearSchemaV1 -> BearSchemaV1.PersistentBear([m
+                         this.issuer.name.toString(),[m
+                         this.color,[m
+[31m-                        this.keyHash,[m
+[31m-                        this.ownerLogin[m
+[32m+[m[32m                        this.ownerLogin,[m
+[32m+[m[32m                        this.active[m
+                 )[m
+                 else -> throw IllegalArgumentException("Unrecognised schema $schema")[m
+             }[m
+[36m@@ -44,6 +45,33 @@[m [mobject StateContract {[m
+         override fun supportedSchemas(): Iterable<MappedSchema> = listOf(BearSchemaV1)[m
+     }[m
+ [m
+[32m+[m[32m    class BearsExchangeState(val issuerLogin: String,[m
+[32m+[m[32m                             val issuerParty: Party,[m
+[32m+[m[32m                             val issuerBearColor: Int,[m
+[32m+[m[32m                             val receiverLogin: String,[m
+[32m+[m[32m                             val receiverParty: Party,[m
+[32m+[m[32m                             val receiverBearColor: Int,[m
+[32m+[m[32m                             var accepted: Boolean) : ContractState, QueryableState {[m
+[32m+[m[32m        override val participants get() = listOf(issuerParty, receiverParty)[m
+[32m+[m
+[32m+[m[32m        override fun generateMappedObject(schema: MappedSchema): PersistentState {[m
+[32m+[m[32m            return when (schema) {[m
+[32m+[m[32m                is BearsExchangeSchemaV1 -> BearsExchangeSchemaV1.PersistentBearsExchange([m
+[32m+[m[32m                        this.issuerLogin,[m
+[32m+[m[32m                        this.issuerParty.name.toString(),[m
+[32m+[m[32m                        this.issuerBearColor,[m
+[32m+[m[32m                        this.receiverLogin,[m
+[32m+[m[32m                        this.receiverParty.name.toString(),[m
+[32m+[m[32m                        this.receiverBearColor,[m
+[32m+[m[32m                        this.accepted[m
+[32m+[m[32m                )[m
+[32m+[m[32m                else -> throw IllegalArgumentException("Unrecognised schema $schema")[m
+[32m+[m[32m            }[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        override fun supportedSchemas(): Iterable<MappedSchema> = listOf(BearsExchangeSchemaV1)[m
+[32m+[m[32m    }[m
+[32m+[m
+     class UserState(val login: String,[m
+                     val password: String,[m
+                     val partyAddress: String,[m
+[1mdiff --git a/src/main/kotlin/com/template/web/SparkUI.kt b/src/main/kotlin/com/template/web/SparkUI.kt[m
+[1mindex 55dccfe..2a66c2d 100644[m
+[1m--- a/src/main/kotlin/com/template/web/SparkUI.kt[m
+[1m+++ b/src/main/kotlin/com/template/web/SparkUI.kt[m
+[36m@@ -16,8 +16,9 @@[m [mimport com.template.flows.UserFlows.UserCreateFlow[m
+ import com.template.flows.BearFlows.BearIssueFlow[m
+ import com.template.flows.BearFlows.BearPresentFlow[m
+ import com.template.flows.BearFlows.BearMixFlow[m
+[31m-import com.template.flows.BearFlows.BearKeyChangeFlow[m
+[31m-import com.template.flows.BearFlows.BearSwapFlow[m
+[32m+[m[32mimport com.template.flows.BearFlows.BearsExchangeInitFlow[m
+[32m+[m[32mimport com.template.flows.BearFlows.BearsExchangeSuggestFlow[m
+[32m+[m[32mimport com.template.flows.BearFlows.BearsExchangeAcceptFlow[m
+ import com.template.schemas.UserSchemaV1[m
+ import net.corda.core.messaging.startFlow[m
+ import net.corda.core.messaging.vaultQueryBy[m
+[36m@@ -61,6 +62,12 @@[m [mobject SparkUI {[m
+                 model["bears"] = partyProxy.vaultQuery(StateContract.BearState::class.java).states.filter { it: StateAndRef<StateContract.BearState> ->[m
+                     (it.state.data.ownerLogin == login)[m
+                 }.map { it: StateAndRef<StateContract.BearState> -> it.state.data }[m
+[32m+[m[32m                model["requests"] = partyProxy.vaultQuery(StateContract.BearsExchangeState::class.java).states.filter { it: StateAndRef<StateContract.BearsExchangeState> ->[m
+[32m+[m[32m                    (it.state.data.receiverLogin == login)[m
+[32m+[m[32m                }.map { it: StateAndRef<StateContract.BearsExchangeState> -> it.state.data }[m
+[32m+[m[32m                model["queries"] = partyProxy.vaultQuery(StateContract.BearsExchangeState::class.java).states.filter { it: StateAndRef<StateContract.BearsExchangeState> ->[m
+[32m+[m[32m                    (it.state.data.issuerLogin == login && it.state.data.accepted == true)[m
+[32m+[m[32m                }.map { it: StateAndRef<StateContract.BearsExchangeState> -> it.state.data }[m
+                 freeMarkerEngine.render(ModelAndView(model, "SparkHome.ftl"))[m
+             }[m
+         }[m
+[36m@@ -199,25 +206,43 @@[m [mobject SparkUI {[m
+             val login = sessions[req.cookie("session")]!!.login[m
+             val partyProxy = SparkUI.getPartyProxy(sessions[req.cookie("session")]!!.partyAddress)[m
+             val color = req.queryParamsValues("color").single().toInt()[m
+[32m+[m[32m            val friend = req.queryParamsValues("friend").single().toString()[m
+             // Check that we have this bear[m
+             val bear = partyProxy.vaultQuery(StateContract.BearState::class.java).states.filter { it: StateAndRef<StateContract.BearState> ->[m
+                 (it.state.data.ownerLogin == login && it.state.data.color == color)[m
+             }[0][m
+[31m-            // Generate key[m
+[31m-            val key = ([m
+[31m-                (random.nextInt() and ((1 shl 16) - 1)).toString(16).padStart(4, ' ') +[m
+[31m-                (random.nextInt() and ((1 shl 16) - 1)).toString(16).padStart(4, ' ') +[m
+[31m-                (random.nextInt() and ((1 shl 16) - 1)).toString(16).padStart(4, ' ') +[m
+[31m-                (random.nextInt() and ((1 shl 16) - 1)).toString(16).padStart(4, ' ')[m
+[31m-            )[m
+[31m-            // Generate hash[m
+[31m-            val keyHash = Base64.getEncoder().encodeToString(MessageDigest.getInstance("SHA-256").digest(key.toByteArray()))[m
+[31m-            // Initiate BearKeyChangeFlow[m
+[31m-            partyProxy.startFlow(::BearKeyChangeFlow, login, color, keyHash).returnValue.getOrThrow()[m
+[31m-            val model = hashMapOf("key" to key)[m
+[31m-            freeMarkerEngine.render(ModelAndView(model, "SparkSwap.ftl"))[m
+[32m+[m[32m            // Initiate BearsExcahngeInitFlow[m
+[32m+[m[32m            partyProxy.startFlow(::BearsExchangeInitFlow, login, friend, color).returnValue.getOrThrow()[m
+[32m+[m[32m            res.redirect("/")[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        http.post("/api/swap/suggest") { req, res ->[m
+[32m+[m[32m            val login = sessions[req.cookie("session")]!!.login[m
+[32m+[m[32m            val partyProxy = SparkUI.getPartyProxy(sessions[req.cookie("session")]!!.partyAddress)[m
+[32m+[m[32m            val color1 = req.queryParamsValues("color1").single().toInt()[m
+[32m+[m[32m            val friend = req.queryParamsValues("friend").single().toString()[m
+[32m+[m[32m            val color2 = req.queryParamsValues("color2").single().toInt()[m
+[32m+[m[32m            // Check that we have this bear[m
+[32m+[m[32m            val bear = partyProxy.vaultQuery(StateContract.BearState::class.java).states.filter { it: StateAndRef<StateContract.BearState> ->[m
+[32m+[m[32m                (it.state.data.ownerLogin == login && it.state.data.color == color2)[m
+[32m+[m[32m            }[0][m
+[32m+[m[32m            // Initiate BearsExcahngeSuggestFlow[m
+[32m+[m[32m            partyProxy.startFlow(::BearsExchangeSuggestFlow, friend, color1, login, color2).returnValue.getOrThrow()[m
+[32m+[m[32m            res.redirect("/")[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        http.post("/api/swap/accept") { req, res ->[m
+[32m+[m[32m            val login = sessions[req.cookie("session")]!!.login[m
+[32m+[m[32m            val partyProxy = SparkUI.getPartyProxy(sessions[req.cookie("session")]!!.partyAddress)[m
+[32m+[m[32m            val color1 = req.queryParamsValues("color1").single().toInt()[m
+[32m+[m[32m            val friend = req.queryParamsValues("friend").single().toString()[m
+[32m+[m[32m            val color2 = req.queryParamsValues("color2").single().toInt()[m
+[32m+[m[32m            // Initiate BearsExcahngeAcceptFlow[m
+[32m+[m[32m            partyProxy.startFlow(::BearsExchangeAcceptFlow, login, color1, friend, color2).returnValue.getOrThrow()[m
+[32m+[m[32m            res.redirect("/")[m
+         }[m
+ [m
+[32m+[m[32m        /*[m
+         http.post("/api/swap/finalize") { req, res ->[m
+             val login = sessions[req.cookie("session")]!!.login[m
+             val partyProxy = SparkUI.getPartyProxy(sessions[req.cookie("session")]!!.partyAddress)[m
+[36m@@ -232,6 +257,7 @@[m [mobject SparkUI {[m
+             partyProxy.startFlow(::BearSwapFlow, login, friendLogin, color, key).returnValue.getOrThrow()[m
+             res.redirect("/")[m
+         }[m
+[32m+[m[32m         */[m
+     }[m
+ [m
+     fun initFreemarker(resourceLoaderClass: Class<*>): FreeMarkerEngine[m
+[1mdiff --git a/src/main/resources/templates/SparkHome.ftl b/src/main/resources/templates/SparkHome.ftl[m
+[1mindex fd61d78..174db3f 100644[m
+[1m--- a/src/main/resources/templates/SparkHome.ftl[m
+[1m+++ b/src/main/resources/templates/SparkHome.ftl[m
+[36m@@ -18,15 +18,17 @@[m
+             <#list bears as bear>[m
+                 <li>[m
+                     Color: ${bear.color}[m
+[32m+[m[32m                    <!--[m
+                     <form action="/api/swap/initialize" method="POST">[m
+                         <input type="hidden" name="color" value="${bear.color}">[m
+[32m+[m[32m                        <input type="text" name="login" placeholder="Login">[m
+                         <button>Swap with friend</button>[m
+                     </form>[m
+[31m-                    <form action="/api/swap/finalize" method="POST">[m
+[32m+[m[32m                    -->[m
+[32m+[m[32m                    <form action="/api/swap/initialize" method="POST">[m
+                         <input type="hidden" name="color" value="${bear.color}">[m
+[31m-                        <input type="text" name="login" placeholder="Login">[m
+[31m-                        <input type="text" name="key" placeholder="0123456789abcdef">[m
+[31m-                        <button>Swap with friend by key</button>[m
+[32m+[m[32m                        <input type="text" name="friend" placeholder="Login">[m
+[32m+[m[32m                        <button>Swap with friend</button>[m
+                     </form>[m
+                     <form action="/api/present" method="POST">[m
+                         <input type="hidden" name="color" value="${bear.color}">[m
+[36m@@ -40,15 +42,46 @@[m
+             </#list>[m
+         </ul>[m
+ [m
+[32m+[m[32m        <ul>[m
+[32m+[m[32m            <#list requests as request>[m
+[32m+[m[32m                <li>[m
+[32m+[m[32m                    Color: ${request.issuerBearColor} </br>[m
+[32m+[m[32m                    Login: ${request.issuerLogin}[m
+[32m+[m[32m                    <form action="/api/swap/suggest" method="POST" id="suggestform">[m
+[32m+[m[32m                        <input type="hidden" name="color2" class="color2">[m
+[32m+[m[32m                        <input type="hidden" name="color1" value="${request.issuerBearColor}">[m
+[32m+[m[32m                        <input type="hidden" name="friend" value="${request.issuerLogin}">[m
+[32m+[m[32m                    </form>[m
+[32m+[m[32m                </li>[m
+[32m+[m[32m            </#list>[m
+[32m+[m[32m        </ul>[m
+[32m+[m
+[32m+[m[32m        <ul>[m
+[32m+[m[32m            <#list queries as query>[m
+[32m+[m[32m                <li>[m
+[32m+[m[32m                    Your bear: ${query.issuerBearColor} </br>[m
+[32m+[m[32m                    Your friend's bear: ${query.receiverBearColor} </br>[m
+[32m+[m[32m                    Friend: ${query.receiverLogin}[m
+[32m+[m[32m                    <form action="/api/swap/accept" method="POST" id="suggestform">[m
+[32m+[m[32m                        <input type="hidden" name="color2" value="${query.receiverBearColor}">[m
+[32m+[m[32m                        <input type="hidden" name="color1" value="${query.issuerBearColor}">[m
+[32m+[m[32m                        <input type="hidden" name="friend" value="${query.receiverLogin}">[m
+[32m+[m[32m                        <button>Accept</button>[m
+[32m+[m[32m                    </form>[m
+[32m+[m[32m                </li>[m
+[32m+[m[32m            </#list>[m
+[32m+[m[32m        </ul>[m
+[32m+[m
+         <button onclick="mix()">Mix</button>[m
+[32m+[m[32m        <button onclick="suggest()">Suggest</button>[m
+ [m
+         <form action="/logout" method="POST">[m
+             <button>Logout</button>[m
+         </form>[m
+ [m
+         <form action="/api/mix" method="POST" id="mixform">[m
+[31m-            <input type="hidden" name="color1" id="color1">[m
+[31m-            <input type="hidden" name="color2" id="color2">[m
+[32m+[m[32m            <input type="hidden" name="color1" class="color1">[m
+[32m+[m[32m            <input type="hidden" name="color2" class="color2">[m
+         </form>[m
+ [m
+         <script type="text/javascript">[m
+[36m@@ -60,10 +93,21 @@[m
+                     alert("2 bears have to be selected");[m
+                     return;[m
+                 }[m
+[31m-                document.querySelector("#color1").value = colors[0];[m
+[31m-                document.querySelector("#color2").value = colors[1];[m
+[32m+[m[32m                document.querySelector(".color1").value = colors[0];[m
+[32m+[m[32m                document.querySelector(".color2").value = colors[1];[m
+                 document.querySelector("#mixform").submit();[m
+             }[m
+[32m+[m[32m            function suggest() {[m
+[32m+[m[32m                const colors = Array.from(document.querySelectorAll(".mixcheckbox"))[m
+[32m+[m[32m                    .filter(checkbox => checkbox.checked)[m
+[32m+[m[32m                    .map(checkbox => checkbox.dataset.color);[m
+[32m+[m[32m                if(colors.length !== 1) {[m
+[32m+[m[32m                    alert("1 bears have to be selected");[m
+[32m+[m[32m                    return;[m
+[32m+[m[32m                }[m
+[32m+[m[32m                document.querySelector(".color2").value = colors[0];[m
+[32m+[m[32m                document.querySelector("#suggestform").submit();[m
+[32m+[m[32m            }[m
+         </script>[m
+     </body>[m
+ </html>[m
+\ No newline at end of file[m
