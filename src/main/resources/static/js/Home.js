@@ -105,9 +105,14 @@ const Home = {
             this.state = "home";
         },
         async doMix(bear) {
+            const otherBear = this.bears[this.$refs.defaultBearList.currentBear];
+            if(otherBear === bear) {
+                this.$refs.modal.alert("You can't mix the same bears.");
+                return;
+            }
             this.state = "mixInProgress";
             try {
-                this.bear = await API.mix(this.bears[this.$refs.defaultBearList.currentBear], bear);
+                this.bear = await API.mix(otherBear, bear);
                 await this.loadBears();
                 this.state = "mixDone";
             } catch(e) {
