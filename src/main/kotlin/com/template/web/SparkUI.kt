@@ -225,10 +225,10 @@ object SparkUI {
             }
             // Generate key
             val key = (
-                (random.nextInt() and ((1 shl 16) - 1)).toString(16).padStart(4, ' ') +
-                (random.nextInt() and ((1 shl 16) - 1)).toString(16).padStart(4, ' ') +
-                (random.nextInt() and ((1 shl 16) - 1)).toString(16).padStart(4, ' ') +
-                (random.nextInt() and ((1 shl 16) - 1)).toString(16).padStart(4, ' ')
+                (random.nextInt() and ((1 shl 16) - 1)).toString(16).padStart(4, '0') +
+                (random.nextInt() and ((1 shl 16) - 1)).toString(16).padStart(4, '0') +
+                (random.nextInt() and ((1 shl 16) - 1)).toString(16).padStart(4, '0') +
+                (random.nextInt() and ((1 shl 16) - 1)).toString(16).padStart(4, '0')
             )
             // Generate hash
             val keyHash = Base64.getEncoder().encodeToString(MessageDigest.getInstance("SHA-256").digest(key.toByteArray()))
