@@ -46,11 +46,12 @@ object BearFlows
             // Ask the userlist party to make sure there is a single user registered
             val userListName = CordaX500Name("UserList", "New York", "US")
             val userListParty = serviceHub.networkMapCache.getPeerByLegalName(userListName)!!
-            val userListProxy = CordaRPCClient(NetworkHostAndPort.parse("127.0.0.1:10005")).start("user1", "test").proxy
-            val cntUsers = userListProxy.vaultQuery(StateContract.UserState::class.java).states.size
+            var userListProxy: CordaRPCOps? = CordaRPCClient(NetworkHostAndPort.parse("127.0.0.1:10005")).start("user1", "test").proxy
+            val cntUsers = userListProxy!!.vaultQuery(StateContract.UserState::class.java).states.size
             if (cntUsers != 1) {
                 throw FlowException("Need exactly one user to be registered to issue bears, got ${cntUsers}")
             }
+            userListProxy = null
 
 
             // We retrieve the notary identity from the network map.
@@ -191,9 +192,9 @@ object BearFlows
             // Ask the userlist party to make sure there is a single user registered
             val userListName = CordaX500Name("UserList", "New York", "US")
             val userListParty = serviceHub.networkMapCache.getPeerByLegalName(userListName)!!
-            val userListProxy = CordaRPCClient(NetworkHostAndPort.parse("127.0.0.1:10005")).start("user1", "test").proxy
+            var userListProxy: CordaRPCOps? = CordaRPCClient(NetworkHostAndPort.parse("127.0.0.1:10005")).start("user1", "test").proxy
             val users = builder {
-                userListProxy.vaultQueryByCriteria<StateContract.UserState>(
+                userListProxy!!.vaultQueryByCriteria<StateContract.UserState>(
                         QueryCriteria.VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)
                         .and(QueryCriteria.VaultCustomQueryCriteria(UserSchemaV1.PersistentUser::login.equal(login))),
                         StateContract.UserState::class.java
@@ -202,6 +203,7 @@ object BearFlows
             if (users == null) {
                 throw FlowException("No such user")
             }
+            userListProxy = null
 
             val bears1 = builder {
                 serviceHub.vaultService.queryBy(
@@ -295,11 +297,6 @@ object BearFlows
         /** The flow logic is encapsulated within the call() method. */
         @Suspendable
         override fun call(): SignedTransaction {
-            // Ask the userlist party to make sure there is a single user registered
-            val userListName = CordaX500Name("UserList", "New York", "US")
-            val userListParty = serviceHub.networkMapCache.getPeerByLegalName(userListName)!!
-            val userListProxy = CordaRPCClient(NetworkHostAndPort.parse("127.0.0.1:10005")).start("user1", "test").proxy
-
             // Check that there are no bears with same key
             val isUnique = builder {
                 serviceHub.vaultService.queryBy(
@@ -393,11 +390,12 @@ object BearFlows
             // Get friend party
             val userListName = CordaX500Name("UserList", "New York", "US")
             val userListParty = serviceHub.networkMapCache.getPeerByLegalName(userListName)!!
-            val userListProxy = CordaRPCClient(NetworkHostAndPort.parse("127.0.0.1:10005")).start("user1", "test").proxy
-            val friend = userListProxy.vaultQuery(StateContract.UserState::class.java).states.filter { it: StateAndRef<StateContract.UserState> ->
+            var userListProxy: CordaRPCOps? = CordaRPCClient(NetworkHostAndPort.parse("127.0.0.1:10005")).start("user1", "test").proxy
+            val friend = userListProxy!!.vaultQuery(StateContract.UserState::class.java).states.filter { it: StateAndRef<StateContract.UserState> ->
                 (it.state.data.login == friendLogin)
             }.singleOrNull()
             friend ?: throw FlowException("The friend is not registered")
+            userListProxy = null
 
             // We retrieve the notary identity from the network map.
             val notary = serviceHub.networkMapCache.notaryIdentities[0]
@@ -409,7 +407,6 @@ object BearFlows
                 KeyFactory.getInstance("EdDSA")
                     .generatePublic(X509EncodedKeySpec(Base64.getDecoder().decode(friend.state.data.partyKey)))
             )
-            val identityProxy = CordaRPCClient(NetworkHostAndPort.parse(friend.state.data.partyAddress)).start("user1", "test").proxy
 
             val keyHash = Base64.getEncoder().encodeToString(MessageDigest.getInstance("SHA-256").digest(key.toByteArray()))
             val inputUserBear = builder {
@@ -428,14 +425,17 @@ object BearFlows
             friendFlow.send(keyHash)
             subFlow(ReceiveTransactionFlow(friendFlow, true, StatesToRecord.ALL_VISIBLE))
 
+            var identityProxy: CordaRPCOps? = CordaRPCClient(NetworkHostAndPort.parse(friend.state.data.partyAddress)).start("user1", "test").proxy
             val inputFriendBear = builder {
-                identityProxy.vaultQueryByCriteria<StateContract.BearState>(
+                identityProxy!!.vaultQueryByCriteria<StateContract.BearState>(
                     VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)
                     .and(VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::ownerLogin.equal(friendLogin)))
                     .and(VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::keyHash.equal(keyHash))),
                     StateContract.BearState::class.java
                 )
             }.states[0]
+            identityProxy = null
+
             val outputUserBear = StateContract.BearState(inputFriendBear.state.data.chars, login, "", ourIdentity)
             val outputFriendBear = StateContract.BearState(inputUserBear.state.data.chars, friendLogin, "", identity)
 
