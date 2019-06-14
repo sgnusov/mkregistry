@@ -82,7 +82,7 @@ const API = new class API {
 			throw new Error(bear.error);
 		}
 		return {
-			color: parseInt(bear.ccolor)
+			color: parseInt(bear.color)
 		};
 	}
 	async present(bear, login) {
