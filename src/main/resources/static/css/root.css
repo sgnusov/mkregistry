@@ -1,0 +1,51 @@
+html {
+    height: 100%;
+}
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    font-size: 16px;
+    background-color: #111;
+    color: #FFF;
+    overflow: hidden;
+    height: 100%;
+}
+
+
+.hr {
+    display: block;
+    height: 2px;
+    background-color: #222;
+}
+
+.away {
+    margin-top: 100vh;
+}
+
+.status {
+    display: flex;
+    height: 100%;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+.status .big {
+    font-size: 48px;
+}
+
+.bump {
+    height: 0;
+    transition: all 0.2s;
+}
+.bump.big {
+    height: calc(50vh - 332px);
+}
+.bump.small {
+    height: calc(50vh - 504px);
+}
+
+.logout {
+    position: fixed;
+    left: 8px;
+    top: 0;
+}

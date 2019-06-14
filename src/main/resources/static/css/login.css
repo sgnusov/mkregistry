@@ -1,0 +1,47 @@
+html {
+    background-color: #111;
+    color: #FFF;
+    font-family: Arial, sans-serif;
+    font-size: 16px;
+    height: 100%;
+}
+body {
+    margin: 0;
+    display: flex;
+    height: 100%;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+}
+
+form {
+    display: flex;
+    flex-direction: column;
+}
+
+table {
+    margin: 0 auto;
+}
+
+h1 {
+    color: #F84;
+}
+
+th {
+    text-align: right;
+}
+
+.input {
+    margin: 0;
+}
+
+.error {
+    margin: 8px 0;
+    color: #F88;
+    text-align: center;
+}
+
+.another-link {
+    margin-top: 16px;
+    color: #88F;
+}
