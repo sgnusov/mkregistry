@@ -24,7 +24,12 @@
                     </tr>
                     <tr>
                         <th>Party:</th>
-                        <th><input type="text" class="input" name="party"></th>
+                        <th>
+                            <select class="input" name="party">
+                                <option value="127.0.0.1:10009">Microsoft &copy;</option>
+                                <option value="127.0.0.1:10013">Apple &copy;</option>
+                            </select>
+                        </th>
                     </tr>
                 </tbody>
             </table>
