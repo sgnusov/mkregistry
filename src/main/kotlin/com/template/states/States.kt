@@ -2,6 +2,7 @@ package com.template.states
 
 import com.template.schemas.UserSchemaV1
 import com.template.schemas.BearSchemaV1
+import com.template.characteristics.Characteristics
 import net.corda.core.contracts.ContractState
 import net.corda.core.contracts.LinearState
 import net.corda.core.contracts.UniqueIdentifier
@@ -23,7 +24,7 @@ import javax.management.Query
 // * State *
 // *********
 object StateContract {
-    class BearState(val color: Int,
+    class BearState(val chars: Characteristics,
                     val ownerLogin: String,
                     val keyHash: String,
                     val issuer: Party) : ContractState, QueryableState {
@@ -33,7 +34,7 @@ object StateContract {
             return when (schema) {
                 is BearSchemaV1 -> BearSchemaV1.PersistentBear(
                         this.issuer.name.toString(),
-                        this.color,
+                        this.chars,
                         this.keyHash,
                         this.ownerLogin
                 )

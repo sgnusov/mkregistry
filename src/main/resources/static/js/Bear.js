@@ -1,7 +1,20 @@
 const Bear = {
     template: `
         <div class="bear">
-            <div :class="['icon', {'big': isBig, 'tiny': isTiny}]" :style="{backgroundColor: uiColor}"></div>
+            <div :class="['icon', {'big': isBig, 'tiny': isTiny}]" :style="{backgroundColor: uiColor}">
+                <div class="hair" :style="{backgroundColor: uiHair}"></div>
+                <div class="hair" :style="{backgroundColor: uiHair}"></div>
+                <div class="hair" :style="{backgroundColor: uiHair}"></div>
+                <div class="hair" :style="{backgroundColor: uiHair}"></div>
+                <div class="hair" :style="{backgroundColor: uiHair}"></div>
+                <div class="hair" :style="{backgroundColor: uiHair}"></div>
+                <br>
+                <div class="eye eye1"></div>
+                <div class="eye eye2"></div>
+                <div class="nose"></div>
+                <div class="lips"></div>
+                <div class="mouth" :style="{backgroundColor: uiLips}"></div>
+            </div>
             <div class="info" v-if="isBig && showInfo">
                 <h2>Characteristics</h2>
                 <table>
@@ -9,6 +22,14 @@ const Bear = {
                         <tr>
                             <th>Color</th>
                             <td>{{color}}</td>
+                        </tr>
+                        <tr>
+                            <th>Hair</th>
+                            <td>{{hair}}</td>
+                        </tr>
+                        <tr>
+                            <th>Lips</th>
+                            <td>{{lips}}</td>
                         </tr>
                     </tbody>
                 </table>
@@ -18,6 +39,8 @@ const Bear = {
     `,
     props: {
         color: Number,
+        lips: Number,
+        hair: Number,
         isBig: Boolean,
         isTiny: Boolean,
         showInfo: Boolean,
@@ -26,16 +49,16 @@ const Bear = {
     data() {
         return {
             color: 0,
+            lips: 0,
+            hair: 0,
             isBig: false,
             isTiny: false,
             showInfo: true,
             actions: []
         };
     },
-    computed: {
-        uiColor() {
-            const color1 = "896248";
-            const color2 = "ffb500";
+    methods: {
+        colorBetween(color1, color2, value) {
             return (
                 "#" +
                 [0, 2, 4]
@@ -47,12 +70,23 @@ const Bear = {
                                 (
                                     parseInt(color2.substr(i, 2), 16) -
                                     parseInt(color1.substr(i, 2), 16)
-                                ) * (this.color / 255)
+                                ) * (value / 255)
                             ).toString(16)
                         ).slice(-2)
                     ))
                     .join("")
             );
+        }
+    },
+    computed: {
+        uiColor() {
+            return this.colorBetween("896248", "ffb500", this.color);
+        },
+        uiLips() {
+            return this.colorBetween("dd1353", "e40000", this.lips) + "7f";
+        },
+        uiHair() {
+            return this.colorBetween("000000", "8c3419", this.hair) + "80";
         }
     }
 };

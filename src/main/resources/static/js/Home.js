@@ -75,7 +75,9 @@ const Home = {
             state: "home",
             bears: [],
             bear: {
-                color: null
+                color: null,
+                hair: null,
+                lips: null
             },
             error: "",
             homeActions: [

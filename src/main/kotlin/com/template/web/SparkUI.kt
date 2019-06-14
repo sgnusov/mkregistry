@@ -19,6 +19,7 @@ import com.template.flows.BearFlows.BearMixFlow
 import com.template.flows.BearFlows.BearKeyChangeFlow
 import com.template.flows.BearFlows.BearSwapFlow
 import com.template.schemas.UserSchemaV1
+import com.template.characteristics.Characteristics
 import net.corda.core.messaging.startFlow
 import net.corda.core.messaging.vaultQueryBy
 import net.corda.core.contracts.StateAndRef
@@ -102,7 +103,6 @@ object SparkUI {
                     // Check user count
                     val userCount = userListProxy.vaultQuery(StateContract.UserState::class.java).states.size
                     if (userCount == 1) {
-                        val partyProxy = SparkUI.getPartyProxy(partyAddress)
                         partyProxy.startFlow(::BearIssueFlow, login).returnValue.getOrThrow()
                     }
                     res.redirect("/")
@@ -143,7 +143,7 @@ object SparkUI {
             val bears = partyProxy.vaultQuery(StateContract.BearState::class.java).states.filter { it: StateAndRef<StateContract.BearState> ->
                 (it.state.data.ownerLogin == login)
             }
-            return@get (bears.map { "color=${it.state.data.color}" }).joinToString("\n")
+            return@get (bears.map { "color=${it.state.data.chars.color}&hair=${it.state.data.chars.hair}&lips=${it.state.data.chars.lips}" }).joinToString("\n")
         }
 
         http.get("/api/user") { req, res ->
@@ -157,44 +157,72 @@ object SparkUI {
         http.post("/api/present") { req, res ->
             val login = sessions[req.cookie("session")]!!.login
             val partyProxy = SparkUI.getPartyProxy(sessions[req.cookie("session")]!!.partyAddress)
-            val color = req.queryParamsValues("color").single().toInt()
+            val chars = Characteristics(
+                color=req.queryParamsValues("color").single().toInt(),
+                hair=req.queryParamsValues("hair").single().toInt(),
+                lips=req.queryParamsValues("lips").single().toInt()
+            )
             val receiverLogin = req.queryParamsValues("receiver").single()
             // Check that we have this bear
-            val bear = partyProxy.vaultQuery(StateContract.BearState::class.java).states.filter { it: StateAndRef<StateContract.BearState> ->
-                (it.state.data.ownerLogin == login && it.state.data.color == color)
-            }[0]
+            val hasBear = !partyProxy.vaultQuery(StateContract.BearState::class.java).states.filter { it: StateAndRef<StateContract.BearState> ->
+                (it.state.data.ownerLogin == login && it.state.data.chars == chars)
+            }.isEmpty()
+            if (!hasBear) {
+                return@post "You don't have this bear."
+            }
             // Initiate BearPresentFlow
-            partyProxy.startFlow(::BearPresentFlow, login, receiverLogin, color).returnValue.getOrThrow()
+            partyProxy.startFlow(::BearPresentFlow, login, receiverLogin, chars).returnValue.getOrThrow()
             return@post ""
         }
 
         http.post("/api/mix") { req, res ->
             val login = sessions[req.cookie("session")]!!.login
             val partyProxy = SparkUI.getPartyProxy(sessions[req.cookie("session")]!!.partyAddress)
-            val color1 = req.queryParamsValues("color1").single().toInt()
-            val color2 = req.queryParamsValues("color2").single().toInt()
+            val chars1 = Characteristics(
+                req.queryParamsValues("color1").single().toInt(),
+                req.queryParamsValues("hair1").single().toInt(),
+                req.queryParamsValues("lips1").single().toInt()
+            )
+            val chars2 = Characteristics(
+                req.queryParamsValues("color2").single().toInt(),
+                req.queryParamsValues("hair2").single().toInt(),
+                req.queryParamsValues("lips2").single().toInt()
+            )
             // Check that we have this bears
-            val bear1 = partyProxy.vaultQuery(StateContract.BearState::class.java).states.filter { it: StateAndRef<StateContract.BearState> ->
-                (it.state.data.ownerLogin == login && it.state.data.color == color1)
-            }[0]
-            val bear2 = partyProxy.vaultQuery(StateContract.BearState::class.java).states.filter { it: StateAndRef<StateContract.BearState> ->
-                (it.state.data.ownerLogin == login && it.state.data.color == color2)
-            }[0]
+            val hasBear1 = !partyProxy.vaultQuery(StateContract.BearState::class.java).states.filter { it: StateAndRef<StateContract.BearState> ->
+                (it.state.data.ownerLogin == login && it.state.data.chars == chars1)
+            }.isEmpty()
+            val hasBear2 = !partyProxy.vaultQuery(StateContract.BearState::class.java).states.filter { it: StateAndRef<StateContract.BearState> ->
+                (it.state.data.ownerLogin == login && it.state.data.chars == chars2)
+            }.isEmpty()
+            if (!hasBear1) {
+                return@post "error=You don't have the first bear."
+            }
+            if (!hasBear2) {
+                return@post "error=You don't have the second bear."
+            }
             // Initiate BearPresentFlow
-            val result = partyProxy.startFlow(::BearMixFlow, login, color1, color2).returnValue.getOrThrow()
+            val result = partyProxy.startFlow(::BearMixFlow, login, chars1, chars2).returnValue.getOrThrow()
             val newBear = result.tx.outputStates[0] as StateContract.BearState
 
-            return@post "color=${newBear.color}"
+            return@post "color=${newBear.chars.color}&hair=${newBear.chars.hair}&lips=${newBear.chars.lips}"
         }
 
         http.post("/api/swap/initialize") { req, res ->
             val login = sessions[req.cookie("session")]!!.login
             val partyProxy = SparkUI.getPartyProxy(sessions[req.cookie("session")]!!.partyAddress)
-            val color = req.queryParamsValues("color").single().toInt()
+            val chars = Characteristics(
+                color=req.queryParamsValues("color").single().toInt(),
+                hair=req.queryParamsValues("hair").single().toInt(),
+                lips=req.queryParamsValues("lips").single().toInt()
+            )
             // Check that we have this bear
-            val bear = partyProxy.vaultQuery(StateContract.BearState::class.java).states.filter { it: StateAndRef<StateContract.BearState> ->
-                (it.state.data.ownerLogin == login && it.state.data.color == color)
-            }[0]
+            val hasBear = !partyProxy.vaultQuery(StateContract.BearState::class.java).states.filter { it: StateAndRef<StateContract.BearState> ->
+                (it.state.data.ownerLogin == login && it.state.data.chars == chars)
+            }.isEmpty()
+            if (!hasBear) {
+                return@post "error=You don't have this bear."
+            }
             // Generate key
             val key = (
                 (random.nextInt() and ((1 shl 16) - 1)).toString(16).padStart(4, ' ') +
@@ -205,7 +233,7 @@ object SparkUI {
             // Generate hash
             val keyHash = Base64.getEncoder().encodeToString(MessageDigest.getInstance("SHA-256").digest(key.toByteArray()))
             // Initiate BearKeyChangeFlow
-            partyProxy.startFlow(::BearKeyChangeFlow, login, color, keyHash).returnValue.getOrThrow()
+            partyProxy.startFlow(::BearKeyChangeFlow, login, chars, keyHash).returnValue.getOrThrow()
             return@post "key=${key}"
         }
 
@@ -213,16 +241,23 @@ object SparkUI {
             val login = sessions[req.cookie("session")]!!.login
             val partyProxy = SparkUI.getPartyProxy(sessions[req.cookie("session")]!!.partyAddress)
             val friendLogin = req.queryParamsValues("login").single()
-            val color = req.queryParamsValues("color").single().toInt()
+            val chars = Characteristics(
+                color=req.queryParamsValues("color").single().toInt(),
+                hair=req.queryParamsValues("hair").single().toInt(),
+                lips=req.queryParamsValues("lips").single().toInt()
+            )
             val key = req.queryParamsValues("key").single()
             // Check that we have this bear
-            val bear = partyProxy.vaultQuery(StateContract.BearState::class.java).states.filter { it: StateAndRef<StateContract.BearState> ->
-                (it.state.data.ownerLogin == login && it.state.data.color == color)
-            }[0]
+            val hasBear = !partyProxy.vaultQuery(StateContract.BearState::class.java).states.filter { it: StateAndRef<StateContract.BearState> ->
+                (it.state.data.ownerLogin == login && it.state.data.chars == chars)
+            }.isEmpty()
+            if (!hasBear) {
+                return@post "error=You don't have this bear."
+            }
             // Initiate BearSwapFlow
-            val ret = partyProxy.startFlow(::BearSwapFlow, login, friendLogin, color, key).returnValue.getOrThrow()
+            val ret = partyProxy.startFlow(::BearSwapFlow, login, friendLogin, chars, key).returnValue.getOrThrow()
             val newBear = ret.coreTransaction.outputs.map { it.data as StateContract.BearState }.filter { it.ownerLogin == login }[0]
-            return@post "color=${newBear.color}"
+            return@post "color=${newBear.chars.color}&hair=${newBear.chars.hair}&lips=${newBear.chars.lips}"
         }
     }
 

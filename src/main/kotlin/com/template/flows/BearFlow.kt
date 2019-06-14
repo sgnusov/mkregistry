@@ -5,6 +5,7 @@ import com.template.contracts.BearContract
 import com.template.states.StateContract
 import com.template.schemas.BearSchemaV1
 import com.template.schemas.UserSchemaV1
+import com.template.characteristics.Characteristics
 import net.corda.client.rpc.CordaRPCClient
 import net.corda.core.contracts.*
 import net.corda.core.utilities.NetworkHostAndPort
@@ -26,7 +27,6 @@ import net.corda.core.transactions.TransactionBuilder
 import net.corda.core.node.StatesToRecord
 import net.corda.core.utilities.unwrap
 import sun.java2d.StateTrackable
-import java.util.Random
 import java.lang.Math
 import java.security.spec.X509EncodedKeySpec
 import java.security.KeyFactory
@@ -61,10 +61,9 @@ object BearFlows
             val txBuilder = TransactionBuilder(notary)
                     .addCommand(txCommand)
 
-            val random = Random()
             for (i in 1..100) {
-                var color = Math.abs(random.nextInt() % 256)
-                val iouState = StateContract.BearState(color, login, "", ourIdentity)
+                val chars = Characteristics.random()
+                val iouState = StateContract.BearState(chars, login, "", ourIdentity)
                 txBuilder.addOutputState(iouState, "com.template.contracts.BearContract")
             }
 
@@ -101,7 +100,7 @@ object BearFlows
     @InitiatingFlow
     @StartableByRPC
     @CordaSerializable
-    class BearPresentFlow(val login: String, val receiverLogin: String, val color: Int) : FlowLogic<SignedTransaction>() {
+    class BearPresentFlow(val login: String, val receiverLogin: String, val chars: Characteristics) : FlowLogic<SignedTransaction>() {
         /** The flow logic is encapsulated within the call() method. */
         @Suspendable
         override fun call(): SignedTransaction {
@@ -130,10 +129,10 @@ object BearFlows
                         criteria =
                         VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)
                                 .and(VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::ownerLogin.equal(login)))
-                                .and(VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::color.equal(color)))
+                                .and(VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::chars.equal(chars)))
                 )
             }.states[0]
-            val outputState = StateContract.BearState(color, receiverLogin, "", identity)
+            val outputState = StateContract.BearState(chars, receiverLogin, "", identity)
             val txCommand = Command(BearContract.Present(), listOf(ourIdentity.owningKey, identity.owningKey))
             val txBuilder = TransactionBuilder(notary)
                     .addCommand(txCommand)
@@ -169,8 +168,8 @@ object BearFlows
                     "This consumes a bear." using (input is StateContract.BearState)
                     "This issues a bear." using (output is StateContract.BearState)
                     "The characteristics aren't changed." using (
-                        (input as StateContract.BearState).color ==
-                        (output as StateContract.BearState).color
+                        (input as StateContract.BearState).chars ==
+                        (output as StateContract.BearState).chars
                     )
                 }
             }
@@ -184,7 +183,7 @@ object BearFlows
     @InitiatingFlow
     @StartableByRPC
     @CordaSerializable
-    class BearMixFlow(val login: String, val color1: Int, val color2: Int) : FlowLogic<SignedTransaction>() {
+    class BearMixFlow(val login: String, val chars1: Characteristics, val chars2: Characteristics) : FlowLogic<SignedTransaction>() {
         /** The flow logic is encapsulated within the call() method. */
         @Suspendable
         override fun call(): SignedTransaction {
@@ -208,7 +207,7 @@ object BearFlows
                     StateContract.BearState::class.java,
                     QueryCriteria.VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)
                     .and(QueryCriteria.VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::ownerLogin.equal(login)))
-                    .and(QueryCriteria.VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::color.equal(color1)))
+                    .and(QueryCriteria.VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::chars.equal(chars1)))
                 )
             }.states
 
@@ -222,7 +221,7 @@ object BearFlows
                         StateContract.BearState::class.java,
                         QueryCriteria.VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)
                                 .and(QueryCriteria.VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::ownerLogin.equal(login)))
-                                .and(QueryCriteria.VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::color.equal(color2)))
+                                .and(QueryCriteria.VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::chars.equal(chars2)))
                 )
             }.states
 
@@ -246,7 +245,7 @@ object BearFlows
                 .addInputState(bear2)
                 .addCommand(txCommand)
 
-            val bearState = StateContract.BearState((color1 + color2) / 2, login, "", ourIdentity)
+            val bearState = StateContract.BearState(chars1.mix(chars2), login, "", ourIdentity)
             txBuilder.addOutputState(bearState, "com.template.contracts.BearContract")
 
             // Stage 2.
@@ -276,7 +275,7 @@ object BearFlows
                     "This consumes bears." using (ledgerTx.inputs.all { it.state.data is StateContract.BearState })
                     val bear1 = ledgerTx.inputs[0].state.data as StateContract.BearState
                     val bear2 = ledgerTx.inputs[1].state.data as StateContract.BearState
-                    "This mixes correctly." using (output.color == (bear1.color + bear2.color) / 2)
+                    "This mixes correctly." using (output.chars == bear1.chars.mix(bear2.chars))
                 }
             }
 
@@ -290,7 +289,7 @@ object BearFlows
     @StartableByRPC
     @CordaSerializable
     class BearKeyChangeFlow(val login: String,
-                            val color: Int,
+                            val chars: Characteristics,
                             val newKeyHash: String) : FlowLogic<SignedTransaction>() {
         /** The flow logic is encapsulated within the call() method. */
         @Suspendable
@@ -320,12 +319,12 @@ object BearFlows
                     criteria =
                     VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)
                     .and(VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::ownerLogin.equal(login)))
-                    .and(VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::color.equal(color)))
+                    .and(VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::chars.equal(chars)))
                 )
             }.states[0]
 
             val outputState = StateContract.BearState(
-                inputState.state.data.color,
+                inputState.state.data.chars,
                 inputState.state.data.ownerLogin,
                 newKeyHash,
                 inputState.state.data.issuer
@@ -372,8 +371,7 @@ object BearFlows
                         (output as StateContract.BearState).ownerLogin
                     )
                     "The characteristics aren't changed." using (
-                        (input as StateContract.BearState).color ==
-                        (output as StateContract.BearState).color
+                        input.chars == output.chars
                     )
                 }
             }
@@ -387,7 +385,7 @@ object BearFlows
     @InitiatingFlow
     @StartableByRPC
     @CordaSerializable
-    class BearSwapFlow(val login: String, val friendLogin: String, val color: Int, val key: String) : FlowLogic<SignedTransaction>() {
+    class BearSwapFlow(val login: String, val friendLogin: String, val chars: Characteristics, val key: String) : FlowLogic<SignedTransaction>() {
         /** The flow logic is encapsulated within the call() method. */
         @Suspendable
         override fun call(): SignedTransaction {
@@ -419,7 +417,7 @@ object BearFlows
                     criteria =
                     VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)
                     .and(VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::ownerLogin.equal(login)))
-                    .and(VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::color.equal(color)))
+                    .and(VaultCustomQueryCriteria(BearSchemaV1.PersistentBear::chars.equal(chars)))
                 )
             }.states[0]
 
@@ -437,8 +435,8 @@ object BearFlows
                     StateContract.BearState::class.java
                 )
             }.states[0]
-            val outputUserBear = StateContract.BearState(inputFriendBear.state.data.color, login, "", ourIdentity)
-            val outputFriendBear = StateContract.BearState(inputUserBear.state.data.color, friendLogin, "", identity)
+            val outputUserBear = StateContract.BearState(inputFriendBear.state.data.chars, login, "", ourIdentity)
+            val outputFriendBear = StateContract.BearState(inputUserBear.state.data.chars, friendLogin, "", identity)
 
             val txCommand = Command(BearContract.Present(), listOf(ourIdentity.owningKey, identity.owningKey))
             val txBuilder = TransactionBuilder(notary)
@@ -493,8 +491,8 @@ object BearFlows
                     "Login sets are equal." using (setOf(inputUserBear.ownerLogin, inputFriendBear.ownerLogin) == setOf(outputUserBear.ownerLogin, outputFriendBear.ownerLogin))
                     "The keys are reset." using (outputUserBear.keyHash.isEmpty() && outputFriendBear.keyHash.isEmpty())
                     "The characteristics match." using (
-                        (inputUserBear.color == outputFriendBear.color && inputFriendBear.color == outputUserBear.color) ||
-                        (inputUserBear.color == outputUserBear.color && inputFriendBear.color == outputFriendBear.color)
+                        (inputUserBear.chars == outputFriendBear.chars && inputFriendBear.chars == outputUserBear.chars) ||
+                        (inputUserBear.chars == outputUserBear.chars && inputFriendBear.chars == outputFriendBear.chars)
                     )
                 }
             }

@@ -20,6 +20,51 @@
     opacity: 0;
 }
 
+.bear .hair {
+    display: inline-block;
+    width: 5%;
+    height: 15%;
+}
+.bear .eye {
+    display: inline-block;
+    width: 20%;
+    height: 20%;
+    background-color: rgba(0, 0, 0, 0.4);
+    border-radius: 50%;
+    margin: 8% 6% 0;
+}
+.bear .eye::before {
+    content: "";
+    display: block;
+    width: 20%;
+    height: 20%;
+    margin: 40% auto;
+    border-radius: 50%;
+    background-color: #000;
+}
+.bear .nose {
+    display: block;
+    width: 12%;
+    height: 12%;
+    background-color: rgba(0, 0, 0, 0.9);
+    border-radius: 50% 50% 20% 20%;
+    margin: 10% auto 0;
+}
+.bear .lips {
+    display: block;
+    width: 34.5%;
+    height: 1%;
+    background-color: rgba(0, 0, 0, 0.9);
+    margin: 15% auto 0;
+}
+.bear .mouth {
+    display: block;
+    width: 35%;
+    height: 8%;
+    border-radius: 20% / 50%;
+    margin: -4.25% auto 0;
+}
+
 .bear .info {
     height: 0;
     overflow: visible;
@@ -33,7 +78,5 @@
 }
 
 .bear .button {
-    display: block;
-    margin-left: auto;
-    margin-right: auto;
+    margin: 16px 4px 0;
 }

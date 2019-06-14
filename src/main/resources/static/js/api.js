@@ -54,35 +54,45 @@ const API = new class API {
 		if(IS_LOCAL) {
 			await sleep(500);
 			return [
-				{color: 12},
-				{color: 78},
-				{color: 153},
-				{color: 211},
-				{color: 10},
-				{color: 100}
+				{color: 12, lips: 12, hair: 12},
+				{color: 78, lips: 156, hair: 156},
+				{color: 153, lips: 17, hair: 17},
+				{color: 211, lips: 200, hair: 200},
+				{color: 10, lips: 13, hair: 13},
+				{color: 100, lips: 100, hair: 100}
 			];
 		}
 		return (await this.callArray("bears", "GET"))
 			.map(bear => ({
-				color: parseInt(bear.color)
+				color: parseInt(bear.color),
+				lips: parseInt(bear.lips),
+				hair: parseInt(bear.hair)
 			}));
 	}
 	async mix(bear1, bear2) {
 		if(IS_LOCAL) {
 			await sleep(1000);
 			return {
-				color: Math.floor((bear1.color + bear2.color) / 2)
+				color: Math.floor((bear1.color + bear2.color) / 2),
+				lips: Math.floor((bear1.lips + bear2.lips) / 2),
+				hair: Math.floor((bear1.hair + bear2.hair) / 2)
 			};
 		}
 		const bear = await this.callMap("mix", "POST", {
 			color1: bear1.color,
-			color2: bear2.color
+			lips1: bear1.lips,
+			hair1: bear1.hair,
+			color2: bear2.color,
+			lips2: bear2.lips,
+			hair2: bear2.hair
 		});
 		if(bear.error) {
 			throw new Error(bear.error);
 		}
 		return {
-			color: parseInt(bear.color)
+			color: parseInt(bear.color),
+			lips: parseInt(bear.lips),
+			hair: parseInt(bear.hair)
 		};
 	}
 	async present(bear, login) {
@@ -92,7 +102,9 @@ const API = new class API {
 		}
 		const res = await this.call("present", "POST", {
 			receiver: login,
-			color: bear.color
+			color: bear.color,
+			lips: bear.lips,
+			hair: bear.hair
 		});
 		if(res !== "") {
 			throw new Error(res);
@@ -105,7 +117,9 @@ const API = new class API {
 			return Math.random().toString(16).substr(2);
 		}
 		const res = await this.callMap("swap/initialize", "POST", {
-			color: bear.color
+			color: bear.color,
+			lips: bear.lips,
+			hair: bear.hair
 		});
 		if(res.error) {
 			throw new Error(res.error);
@@ -116,13 +130,17 @@ const API = new class API {
 		if(IS_LOCAL) {
 			await sleep(1000);
 			return {
-				color: 123
+				color: 123,
+				lips: 20,
+				hair: 200
 			};
 		}
 		const res = await this.callMap("swap/finalize", "POST", {
 			login,
 			key,
-			color: bear.color
+			color: bear.color,
+			lips: bear.lips,
+			hair: bear.hair
 		});
 		if(res.error) {
 			throw new Error(res.error);

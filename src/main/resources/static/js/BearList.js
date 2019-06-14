@@ -13,7 +13,7 @@ const BearList = {
                     <div class="inner-container">
                         <Bear
                             v-show="currentBear <= 1"
-                            :color="0"
+                            :color="0" :hair="0" :lips="0"
                             :isBig="false"
                             :isTiny="true"
                             :showInfo="showInfo"
@@ -21,7 +21,7 @@ const BearList = {
                         />
                         <Bear
                             v-show="currentBear === 0"
-                            :color="0"
+                            :color="0" :hair="0" :lips="0"
                             :isBig="false"
                             :isTiny="false"
                             :showInfo="showInfo"
@@ -42,7 +42,7 @@ const BearList = {
                         </template>
                         <Bear
                             v-show="currentBear === bears.length - 1"
-                            :color="0"
+                            :color="0" :hair="0" :lips="0"
                             :isBig="false"
                             :isTiny="false"
                             :showInfo="showInfo"
@@ -51,7 +51,7 @@ const BearList = {
                         />
                         <Bear
                             v-show="currentBear >= bears.length - 2"
-                            :color="0"
+                            :color="0" :hair="0" :lips="0"
                             :isBig="false"
                             :isTiny="true"
                             :showInfo="showInfo"
