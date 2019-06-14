@@ -41,6 +41,10 @@ const Home = {
             </div>
 
             <div v-else>
+                <form action="/logout" method="POST" class="logout">
+                    <button class="button">Logout</button>
+                </form>
+
                 <div :class="['bump', {big: state === 'home', small: state === 'mixing'}]"></div>
                 <BearList
                     :bears="bears"
