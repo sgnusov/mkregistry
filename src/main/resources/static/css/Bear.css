@@ -4,15 +4,15 @@
 
 .bear .icon {
     display: inline-block;
-    width: 200px;
-    height: 200px;
+    width: 160px;
+    height: 160px;
     margin: 20px 32px;
     border-radius: 30% 30% 50% 50%;
     transition: all 0.2s;
 }
 .bear .icon.big {
-    width: 300px;
-    height: 300px;
+    width: 250px;
+    height: 250px;
 }
 .bear .icon.tiny {
     width: 100px;

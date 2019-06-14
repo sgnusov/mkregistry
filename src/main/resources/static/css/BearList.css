@@ -1,6 +1,6 @@
 .bear-list {
     display: flex;
-    height: 344px;
+    height: 294px;
     flex-direction: row;
     align-items: center;
     justify-content: center;
@@ -27,8 +27,8 @@
     height: 100%;
 }
 .bear-list.big .container {
-    padding-bottom: 156px;
-    margin-top: 156px;
+    padding-bottom: 180px;
+    margin-top: 180px;
 }
 .bear-list .inner-container {
     display: flex;
