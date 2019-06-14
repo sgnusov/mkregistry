@@ -23,16 +23,8 @@ const Home = {
             <div class="status" v-else-if="state === 'exchangeInProgress'">
                 <div class="big">Exchanging...</div>
             </div>
-            <div class="status" v-else-if="state === 'exchangeDone'">
-                <div class="big">You've got a new bear!</div>
-                <Bear
-                    v-bind="bear"
-                    :isBig="true"
-                    :isTiny="false"
-                    :showInfo="true"
-                    :actions="exchangeDoneActions"
-                    @close="doneExchange"
-                />
+            <div class="status" v-else-if="state === 'exchangeCancelInProgress'">
+                <div class="big">Canceling exchange...</div>
             </div>
 
             <div class="status" v-else-if="state === 'error'">
@@ -50,9 +42,11 @@ const Home = {
                     :bears="bears"
                     :showInfo="state === 'home'"
                     :actions="homeActions"
+                    :inactiveActions="inactiveHomeActions"
                     @mix="startMix"
                     @present="startPresent"
                     @exchange="startExchange"
+                    @cancelExchange="cancelExchangeInit"
                     ref="defaultBearList"
                 />
                 <div :class="{away: state !== 'mixing'}" style="transition: all 0.2s">
@@ -61,7 +55,9 @@ const Home = {
                         :bears="bears"
                         :showInfo="true"
                         :actions="mixingActions"
+                        :inactiveActions="inactiveHomeActions"
                         @cancel="cancelMix"
+                        @cancelExchange="cancelExchangeInit"
                         @mix="doMix"
                     />
                 </div>
@@ -84,6 +80,9 @@ const Home = {
                 {text: "Mix", name: "mix"},
                 {text: "Present", name: "present"},
                 {text: "Exchange", name: "exchange"}
+            ],
+            inactiveHomeActions: [
+                {text: "Cancel exchange", name: "cancelExchange"}
             ],
             mixingActions: [
                 {text: "Mix", name: "mix"},
@@ -146,42 +145,31 @@ const Home = {
         },
 
         async startExchange(bear) {
-            const query = await this.$refs.modal.select("Has your friend given your a key?", ["Yes", "No"]);
-            if(!query) {
+            const login = await this.$refs.modal.prompt("What's your friend's login?");
+            if(!login) {
                 return;
             }
-            if(query === "Yes") {
-                const key = await this.$refs.modal.prompt("What was the key?");
-                if(!key) {
-                    return;
-                }
-                const login = await this.$refs.modal.prompt("What's your friend's login?");
-                if(!login) {
-                    return;
-                }
-                this.state = "exchangeInProgress";
-                try {
-                    this.bear = await API.exchange(bear, login, key);
-                    await this.loadBears();
-                    this.state = "exchangeDone";
-                } catch(e) {
-                    this.error = e.toString();
-                    this.state = "error";
-                }
-            } else {
-                this.state = "exchangeInProgress";
-                try {
-                    const key = await API.changeKey(bear);
-                    this.state = "home";
-                    await this.$refs.modal.alert(`Share this key: ${key}`);
-                } catch(e) {
-                    this.error = e.toString();
-                    this.state = "error";
-                }
+            this.state = "exchangeInProgress";
+            try {
+                await API.initExchange(bear, login);
+                await this.loadBears();
+                this.state = "home";
+            } catch(e) {
+                this.error = e.toString();
+                this.state = "error";
             }
         },
-        doneExchange() {
-            this.state = "home";
+
+        async cancelExchangeInit(bear) {
+            this.state = "exchangeCancelInProgress";
+            try {
+                await API.cancelExchange(bear);
+                await this.loadBears();
+                this.state = "home";
+            } catch(e) {
+                this.error = e.toString();
+                this.state = "error";
+            }
         },
 
         errorOk() {

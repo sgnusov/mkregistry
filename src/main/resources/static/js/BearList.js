@@ -16,7 +16,7 @@ const BearList = {
                             :color="0" :hair="0" :lips="0"
                             :isBig="false"
                             :isTiny="true"
-                            :showInfo="showInfo"
+                            :showInfo="false"
                             :actions="actions"
                         />
                         <Bear
@@ -24,7 +24,7 @@ const BearList = {
                             :color="0" :hair="0" :lips="0"
                             :isBig="false"
                             :isTiny="false"
-                            :showInfo="showInfo"
+                            :showInfo="false"
                             :actions="actions"
                             style="visibility: hidden; pointer-events: none"
                         />
@@ -36,7 +36,7 @@ const BearList = {
                                 :isBig="i === currentBear"
                                 :isTiny="Math.abs(i - currentBear) === 2"
                                 :showInfo="showInfo"
-                                :actions="actions"
+                                :actions="bear.active ? actions : inactiveActions"
                                 @action="name => $emit(name, bear)"
                             />
                         </template>
@@ -45,7 +45,7 @@ const BearList = {
                             :color="0" :hair="0" :lips="0"
                             :isBig="false"
                             :isTiny="false"
-                            :showInfo="showInfo"
+                            :showInfo="false"
                             :actions="actions"
                             style="visibility: hidden; pointer-events: none"
                         />
@@ -54,7 +54,7 @@ const BearList = {
                             :color="0" :hair="0" :lips="0"
                             :isBig="false"
                             :isTiny="true"
-                            :showInfo="showInfo"
+                            :showInfo="false"
                             :actions="actions"
                         />
                     </div>
@@ -75,13 +75,16 @@ const BearList = {
     props: {
         bears: Array,
         showInfo: Boolean,
-        actions: Array
+        actions: Array,
+        inactiveActions: Array
     },
     data() {
         return {
             bears: [],
             currentBear: 0,
-            showInfo: true
+            showInfo: true,
+            actions: [],
+            inactiveActions: []
         };
     },
     methods: {
