@@ -80,7 +80,7 @@ object SparkUI {
             challange[34] = ((nonceInt shr 16) and 0xFF).toByte()
             challange[35] = ((nonceInt shr 24) and 0xFF).toByte()
             val digest = MessageDigest.getInstance("SHA-256").digest(challange)
-            if (digest[0] > 0 || digest[1] > 1) {
+            if (digest[0] > 0) {
                 val model = hashMapOf("error" to "The challange is invalid.")
                 freeMarkerEngine.render(ModelAndView(model, "SparkRegister.ftl"))
             } else {

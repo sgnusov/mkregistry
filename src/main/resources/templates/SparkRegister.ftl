@@ -38,8 +38,19 @@
         </form>
         <a class="another-link" href="/">Have an account already? Login</a>
 
+        <script type="text/javascript" src="js/sha256.min.js"></script>
         <script type="text/javascript">
             let isDoingPoW = false, isPoWDone = false;
+
+            function getSha256(buf) {
+                const hex = sha256(buf);
+                const res = new Uint8Array(hex.length / 2);
+                for(let i = 0; i < res.length; i++) {
+                    res[i] = (parseInt(hex[i * 2], 16) << 4) | parseInt(hex[i * 2 + 1], 16);
+                }
+                return new Promise(resolve => setTimeout(() => resolve(res), 0));
+            }
+
             function onSubmit(e) {
                 if(isPoWDone) {
                     return;
@@ -55,7 +66,7 @@
                 document.querySelector("#login").disabled = true;
 
                 (async () => {
-                    const pref = new Uint8Array(await crypto.subtle.digest("SHA-256", new Uint8Array(login.split("").map(c => c.charCodeAt(0)))));
+                    const pref = await getSha256(new Uint8Array(login.split("").map(c => c.charCodeAt(0))));
                     let nonce = 0;
                     while(true) {
                         let buffer = new Uint8Array(36);
@@ -66,8 +77,8 @@
                         buffer[33] = (nonce >> 8) & 0xFF;
                         buffer[34] = (nonce >> 16) & 0xFF;
                         buffer[35] = (nonce >> 24) & 0xFF;
-                        const sha = new Uint8Array(await crypto.subtle.digest("SHA-256", buffer));
-                        if(sha[0] === 0 && sha[1] <= 1) {
+                        const sha = await getSha256(buffer);
+                        if(sha[0] === 0) {
                             break;
                         }
                         nonce++;
