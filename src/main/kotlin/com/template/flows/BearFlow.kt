@@ -21,6 +21,7 @@ import net.corda.core.node.services.vault.builder
 import net.corda.core.flows.*
 import net.corda.core.identity.CordaX500Name
 import net.corda.core.identity.Party
+import net.corda.core.messaging.CordaRPCOps
 import net.corda.core.serialization.CordaSerializable
 import net.corda.core.transactions.SignedTransaction
 import net.corda.core.transactions.TransactionBuilder
@@ -107,11 +108,12 @@ object BearFlows
             // Get receiver party
             val userListName = CordaX500Name("UserList", "New York", "US")
             val userListParty = serviceHub.networkMapCache.getPeerByLegalName(userListName)!!
-            val userListProxy = CordaRPCClient(NetworkHostAndPort.parse("127.0.0.1:10005")).start("user1", "test").proxy
-            val receiver = userListProxy.vaultQuery(StateContract.UserState::class.java).states.filter { it: StateAndRef<StateContract.UserState> ->
+            var userListProxy: CordaRPCOps? = CordaRPCClient(NetworkHostAndPort.parse("127.0.0.1:10005")).start("user1", "test").proxy
+            val receiver = userListProxy!!.vaultQuery(StateContract.UserState::class.java).states.filter { it: StateAndRef<StateContract.UserState> ->
                 (it.state.data.login == receiverLogin)
             }.singleOrNull()
             receiver ?: throw FlowException("The receiver is not registered")
+            userListProxy = null
 
             // We retrieve the notary identity from the network map.
             val notary = serviceHub.networkMapCache.notaryIdentities[0]
@@ -135,8 +137,7 @@ object BearFlows
             val outputState = StateContract.BearState(chars, receiverLogin, "", identity)
             val txCommand = Command(BearContract.Present(), listOf(ourIdentity.owningKey, identity.owningKey))
             val txBuilder = TransactionBuilder(notary)
-                    .addCommand(txCommand)
-
+                .addCommand(txCommand)
             txBuilder.addInputState(inputState)
             txBuilder.addOutputState(outputState, "com.template.contracts.BearContract")
 
