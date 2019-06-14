@@ -8,7 +8,7 @@
     </head>
 
     <body>
-        <h1>Login</h1>
+        <h1>Register</h1>
 
         <form action="/register" method="POST" onsubmit="return onSubmit(event)">
             <input type="hidden" name="nonce" id="nonce">
