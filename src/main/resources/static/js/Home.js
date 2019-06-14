@@ -32,10 +32,82 @@ const Home = {
                 <button class="button" @click="errorOk">Ok</button>
             </div>
 
+            <div v-else-if="state === 'requests' || state === 'exchangeSuggestion'">
+                <form action="/logout" method="POST" class="logout">
+                    <button class="button">Logout</button>
+                </form>
+                <button class="button requests" @click="showHome()">
+                    Back to my bears
+                </button>
+
+                <div :class="['bump', {big: state === 'requests', small: state === 'exchangeSuggestion'}]"></div>
+                <keep-alive>
+                    <BearList
+                        :bears="requests"
+                        :showInfo="state !== 'exchangeSuggestion'"
+                        :actions="requestsActions"
+                        :inactiveActions="requestsActions"
+                        @accept="startExchangeSuggestion"
+                        ref="requestsList"
+                    />
+                </keep-alive>
+                <div :class="{away: state !== 'exchangeSuggestion'}" style="transition: all 0.2s">
+                    <keep-alive>
+                        <div class="hr"></div>
+                        <BearList
+                            :bears="bears"
+                            :showInfo="true"
+                            :actions="exchangeSuggestionActions"
+                            :inactiveActions="inactiveExchangeSuggestionActions"
+                            @cancel="stopExchangeSuggestion"
+                            @cancelExchange="cancelExchange"
+                            @suggest="doExchangeSuggest"
+                        />
+                    </keep-alive>
+                </div>
+            </div>
+
+            <div v-else-if="state === 'suggestions'">
+                <form action="/logout" method="POST" class="logout">
+                    <button class="button">Logout</button>
+                </form>
+                <button class="button requests" @click="showHome()">
+                    Back to my bears
+                </button>
+
+                <div class="bump big"></div>
+                <div class="suggestion">
+                    <Bear
+                        v-bind="suggestions[0]"
+                        :isBig="true"
+                        :isTiny="false"
+                        :showInfo="true"
+                        :actions="suggestionsActionsOur"
+                        @reject="rejectExchange"
+                    />
+                    <Bear
+                        v-bind="suggestions[0].suggestedBear"
+                        :isBig="true"
+                        :isTiny="false"
+                        :showInfo="true"
+                        :actions="suggestionsActionsTheir"
+                        @accept="acceptExchange"
+                    />
+                </div>
+            </div>
+
             <div v-else>
                 <form action="/logout" method="POST" class="logout">
                     <button class="button">Logout</button>
                 </form>
+                <button class="button requests" v-if="requests.length > 0" @click="showExchangeRequests()">
+                    <template v-if="requests.length === 1">One exchange request</template>
+                    <template v-else>{{requests.length}} exchange requests</template>
+                </button>
+                <button class="button suggestions" v-if="suggestions.length > 0" @click="showExchangeSuggestions()">
+                    <template v-if="suggestions.length === 1">One exchange to be finished</template>
+                    <template v-else>{{suggestions.length}} exchanges to be finished</template>
+                </button>
 
                 <div :class="['bump', {big: state === 'home', small: state === 'mixing'}]"></div>
                 <BearList
@@ -46,7 +118,7 @@ const Home = {
                     @mix="startMix"
                     @present="startPresent"
                     @exchange="startExchange"
-                    @cancelExchange="cancelExchangeInit"
+                    @cancelExchange="cancelExchange"
                     ref="defaultBearList"
                 />
                 <div :class="{away: state !== 'mixing'}" style="transition: all 0.2s">
@@ -57,7 +129,7 @@ const Home = {
                         :actions="mixingActions"
                         :inactiveActions="inactiveHomeActions"
                         @cancel="cancelMix"
-                        @cancelExchange="cancelExchangeInit"
+                        @cancelExchange="cancelExchange"
                         @mix="doMix"
                     />
                 </div>
@@ -70,6 +142,7 @@ const Home = {
         return {
             state: "home",
             bears: [],
+            requests: [],
             bear: {
                 color: null,
                 hair: null,
@@ -91,20 +164,44 @@ const Home = {
             mixDoneActions: [
                 {text: "Yay!", name: "close"}
             ],
+            requestsActions: [
+                {text: "Accept request", name: "accept"}
+            ],
             exchangeDoneActions: [
                 {text: "Yay!", name: "close"}
+            ],
+            inactiveExchangeSuggestionActions: [
+                {text: "Cancel exchange with another friend", name: "cancelExchange"}
+            ],
+            exchangeSuggestionActions: [
+                {text: "Suggest", name: "suggest"},
+                {text: "Cancel", name: "cancel"}
+            ],
+            suggestionsActionsOur: [
+                {text: "Reject: Leave this bear", name: "reject"}
+            ],
+            suggestionsActionsTheir: [
+                {text: "Accept: Exchange with this bear", name: "accept"}
             ]
         };
     },
     mounted() {
-        this.loadBears();
+        this.loadInterval();
     },
     methods: {
+        async loadInterval() {
+            await this.loadBears();
+            await this.loadRequests();
+            setTimeout(() => this.loadInterval(), 5000);
+        },
         async loadBears() {
             this.bears = await API.getBears();
         },
+        async loadRequests() {
+            this.requests = await API.getRequests();
+        },
 
-        startMix(bear) {
+        startMix() {
             this.state = "mixing";
         },
         cancelMix() {
@@ -159,11 +256,14 @@ const Home = {
                 this.state = "error";
             }
         },
-
-        async cancelExchangeInit(bear) {
+        async cancelExchange(bear) {
             this.state = "exchangeCancelInProgress";
             try {
-                await API.cancelExchange(bear);
+                if(bear.init) {
+                    await API.cancelExchange(bear);
+                } else if(bear.suggest) {
+                    await API.cancelExchangeSuggest(bear, bear.suggest);
+                }
                 await this.loadBears();
                 this.state = "home";
             } catch(e) {
@@ -172,8 +272,69 @@ const Home = {
             }
         },
 
+        async startExchangeSuggestion() {
+            this.state = "exchangeSuggestion";
+        },
+        stopExchangeSuggestion() {
+            this.state = "requests";
+        },
+        async doExchangeSuggest(bear) {
+            const friendBear = this.bears[this.$refs.requestsList.currentBear];
+            this.state = "exchangeInProgress";
+            try {
+                await API.suggestExchange(bear, friendBear);
+                this.state = "home";
+            } catch(e) {
+                this.error = e.toString();
+                this.state = "error";
+            }
+        },
+
+        async acceptExchange() {
+            this.state = "exchangeInProgress";
+            try {
+                await API.acceptExchange(
+                    this.suggestions[0],
+                    this.suggestions[0].suggestedBear,
+                    this.suggestions[0].suggestedBear.ownerLogin
+                );
+                this.state = "home";
+            } catch(e) {
+                this.error = e.toString();
+                this.state = "error";
+            }
+        },
+        async rejectExchange() {
+            this.state = "exchangeCancelInProgress";
+            try {
+                await API.rejectExchange(
+                    this.suggestions[0],
+                    this.suggestions[0].suggestedBear,
+                    this.suggestions[0].suggestedBear.ownerLogin
+                );
+                this.state = "home";
+            } catch(e) {
+                this.error = e.toString();
+                this.state = "error";
+            }
+        },
+
+        showExchangeRequests() {
+            this.state = "requests";
+        },
+        showExchangeSuggestions() {
+            this.state = "suggestions";
+        },
+        showHome() {
+            this.state = "home";
+        },
         errorOk() {
             this.state = "home";
+        }
+    },
+    computed: {
+        suggestions() {
+            return this.bears.filter(bear => !bear.active && bear.init && bear.suggestedBear);
         }
     }
 };

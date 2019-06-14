@@ -44,8 +44,22 @@ body {
     height: calc(50vh - 504px);
 }
 
-.logout {
+.logout, .requests, .suggestions {
     position: fixed;
     left: 8px;
+}
+.logout {
     top: 0;
+}
+.requests {
+    top: 40px;
+}
+.suggestions {
+    top: 80px;
+}
+
+.suggestion {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
 }
